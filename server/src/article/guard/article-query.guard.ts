@@ -8,6 +8,7 @@ import {
 import { Observable } from 'rxjs';
 import { AuthenticatedRequest } from '../../guard/authenticated-request.interface';
 import { ArticleStatus } from '../../generated/prisma/enums';
+import { Response } from 'express';
 
 @Injectable()
 export class ArticleQueryGuard implements CanActivate {
@@ -15,6 +16,7 @@ export class ArticleQueryGuard implements CanActivate {
     context: ExecutionContext,
   ): boolean | Promise<boolean> | Observable<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const response = context.switchToHttp().getResponse<Response>();
 
     const { status, startDate, endDate } = request.query;
 
@@ -37,6 +39,12 @@ export class ArticleQueryGuard implements CanActivate {
       );
     }
 
+    response.set(
+      'Cache-control',
+      request.isAuthenticated
+        ? 'private, no-store'
+        : 'public, max-age=0, s-maxage=60, stale-while-revalidate=30',
+    );
     return true;
   }
 }

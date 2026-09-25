@@ -92,7 +92,7 @@
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!slug/|@nestjs/terminus/|@nestjs/config/|@nestjs/cache-manager)"
+      "node_modules/(?!slug/|@nestjs/terminus/|@nestjs/config)"
     ]
   }
 }

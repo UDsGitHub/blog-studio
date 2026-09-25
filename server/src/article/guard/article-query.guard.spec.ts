@@ -9,8 +9,10 @@ import { ArticleStatus } from '../../generated/prisma/enums';
 describe('Article Query Guard', () => {
   let guard: ArticleQueryGuard;
   const getRequest = jest.fn();
+  const set = jest.fn();
+  const getResponse = () => ({ set });
   const context = {
-    switchToHttp: () => ({ getRequest }),
+    switchToHttp: () => ({ getRequest, getResponse }),
   } as unknown as ExecutionContext;
 
   beforeEach(() => {
@@ -21,11 +23,13 @@ describe('Article Query Guard', () => {
   it('missing status throws 400 when unauthenticated', () => {
     getRequest.mockReturnValue({ isAuthenticated: false, query: {} });
     expect(() => guard.canActivate(context)).toThrow(BadRequestException);
+    expect(set).not.toHaveBeenCalled();
   });
 
   it('missing status returns true when authenticated', () => {
     getRequest.mockReturnValue({ isAuthenticated: true, query: {} });
     expect(guard.canActivate(context)).toBe(true);
+    expect(set).toHaveBeenCalledWith('Cache-control', 'private, no-store');
   });
 
   it('DRAFT | ARCHIVED fetch throws 401 when unauthenticated', () => {
@@ -40,6 +44,7 @@ describe('Article Query Guard', () => {
 
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
     expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
+    expect(set).not.toHaveBeenCalled();
   });
 
   it('DRAFT | ARCHIVED returns true when authenticated', () => {
@@ -54,6 +59,7 @@ describe('Article Query Guard', () => {
 
     expect(guard.canActivate(context)).toBe(true);
     expect(guard.canActivate(context)).toBe(true);
+    expect(set).toHaveBeenCalledWith('Cache-control', 'private, no-store');
   });
 
   it('throws 400 when date range filter are passed without status', () => {
@@ -71,6 +77,7 @@ describe('Article Query Guard', () => {
 
     expect(() => guard.canActivate(context)).toThrow(BadRequestException);
     expect(() => guard.canActivate(context)).toThrow(BadRequestException);
+    expect(set).not.toHaveBeenCalled();
   });
 
   it('returns true when date range filters are passed with status', () => {
@@ -93,6 +100,16 @@ describe('Article Query Guard', () => {
 
     expect(guard.canActivate(context)).toBe(true);
     expect(guard.canActivate(context)).toBe(true);
+    expect(set).toHaveBeenNthCalledWith(
+      1,
+      'Cache-control',
+      'public, max-age=0, s-maxage=60, stale-while-revalidate=30',
+    );
+    expect(set).toHaveBeenNthCalledWith(
+      2,
+      'Cache-control',
+      'private, no-store',
+    );
   });
 
   it('returns true when status only passed', () => {
@@ -111,5 +128,15 @@ describe('Article Query Guard', () => {
 
     expect(guard.canActivate(context)).toBe(true);
     expect(guard.canActivate(context)).toBe(true);
+    expect(set).toHaveBeenNthCalledWith(
+      1,
+      'Cache-control',
+      'public, max-age=0, s-maxage=60, stale-while-revalidate=30',
+    );
+    expect(set).toHaveBeenNthCalledWith(
+      2,
+      'Cache-control',
+      'private, no-store',
+    );
   });
 });

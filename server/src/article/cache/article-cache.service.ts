@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ArticleStatus } from '../../generated/prisma/client';
 import { RedisService } from '../../redis.service';
 
@@ -6,15 +6,47 @@ import { RedisService } from '../../redis.service';
 export class ArticleCacheService {
   private readonly versionKey = 'articles:version';
   private TTL = 60;
+  private readonly OP_TIMEOUT_MS = 800;
 
   constructor(private readonly redis: RedisService) {}
 
+  private withTimeout<T>(promise: Promise<T>, ms = this.OP_TIMEOUT_MS) {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`redis op timed out after ${ms}ms`)),
+        ms,
+      );
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error as Error);
+        },
+      );
+    });
+  }
+
   private async getVersion() {
-    return Number((await this.redis.get(this.versionKey)) ?? 0);
+    try {
+      return Number(
+        (await this.withTimeout(this.redis.get(this.versionKey))) ?? 0,
+      );
+    } catch (error) {
+      Logger.error(error);
+    }
+
+    return 0;
   }
 
   async bumpVersion() {
-    await this.redis.incr(this.versionKey);
+    try {
+      await this.withTimeout(this.redis.incr(this.versionKey));
+    } catch (error) {
+      Logger.error(error);
+    }
   }
 
   private async getVersionPrefix() {
@@ -22,8 +54,15 @@ export class ArticleCacheService {
     return `articles:v${version}`;
   }
 
-  async get<T>(key: string) {
-    return JSON.parse((await this.redis.get(key)) ?? 'null') as T;
+  async get<T>(key: string): Promise<T | null> {
+    try {
+      return JSON.parse(
+        (await this.withTimeout(this.redis.get(key))) ?? 'null',
+      ) as T | null;
+    } catch (error) {
+      Logger.error(error);
+    }
+    return null;
   }
 
   /**
@@ -32,7 +71,13 @@ export class ArticleCacheService {
    * @param ttl - cache entry TTL in seconds
    */
   async set<T>(key: string, value: T, ttl?: number) {
-    return this.redis.set(key, JSON.stringify(value), 'EX', ttl ?? this.TTL);
+    try {
+      await this.withTimeout(
+        this.redis.set(key, JSON.stringify(value), 'EX', ttl ?? this.TTL),
+      );
+    } catch (error) {
+      Logger.error(error);
+    }
   }
 
   async browseKey(

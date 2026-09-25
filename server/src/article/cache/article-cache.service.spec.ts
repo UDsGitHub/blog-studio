@@ -24,6 +24,11 @@ describe('Article Cache Service', () => {
     expect(redis.incr).toHaveBeenCalledWith(versionKey);
   });
 
+  it('bumpVersion swallows redis errors', async () => {
+    redis.incr.mockRejectedValue(new Error('redis down'));
+    await expect(service.bumpVersion()).resolves.toBeUndefined();
+  });
+
   it('get calls redis.get()', async () => {
     redis.get.mockResolvedValue(
       '{"title":"title","slug":"slug","body":"body","excerpt":"","status":"PUBLISHED","createdAt":"2026-09-25T08:35:33.123Z"}',
@@ -42,6 +47,21 @@ describe('Article Cache Service', () => {
     });
   });
 
+  it('get returns null on cache miss', async () => {
+    redis.get.mockResolvedValue(null);
+    await expect(service.get('missing')).resolves.toBeNull();
+  });
+
+  it('get returns null when redis throws', async () => {
+    redis.get.mockRejectedValue(new Error('redis down'));
+    await expect(service.get('key')).resolves.toBeNull();
+  });
+
+  it('get returns null when cached value is invalid JSON', async () => {
+    redis.get.mockResolvedValue('not-json');
+    await expect(service.get('key')).resolves.toBeNull();
+  });
+
   it('set calls redis.set()', async () => {
     await service.set('key', [{ title: 'title', body: 'body' }]);
     expect(redis.set).toHaveBeenCalledWith(
@@ -50,6 +70,13 @@ describe('Article Cache Service', () => {
       'EX',
       TTL,
     );
+  });
+
+  it('set swallows redis errors', async () => {
+    redis.set.mockRejectedValue(new Error('redis down'));
+    await expect(
+      service.set('key', { title: 'title' }),
+    ).resolves.toBeUndefined();
   });
 
   it('browseKey()', async () => {
@@ -61,6 +88,18 @@ describe('Article Cache Service', () => {
     );
     expect(redis.get).toHaveBeenCalledWith(versionKey);
     expect(response).toBe(expected);
+  });
+
+  it('browseKey falls back to v0 when version lookup fails', async () => {
+    redis.get.mockRejectedValue(new Error('redis down'));
+    const response = await service.browseKey(
+      25,
+      undefined,
+      ArticleStatus.PUBLISHED,
+    );
+    expect(response).toBe(
+      'articles:v0:browse:25:undefined:PUBLISHED:undefined:undefined',
+    );
   });
 
   it('searchKey()', async () => {

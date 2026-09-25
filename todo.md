@@ -4,6 +4,8 @@
 - [x] include excerpt in select for non-search article list and exclude body. derive excerpt from body if excerpt is empty
 - [x] env file for container seems to be using my regular env not test env... adding envfilepath in app module gets the test env in for docker, but when i run the app, it uses test env instead of regular env
 - [ ] figure out appropriate TTLs for cache keys
+- [ ] discuss Redis/cache logging: instance Logger + context vs Logger.error(error); warn vs error; include op/key; avoid noisy reconnect spam
+- [ ] optional Redis hardening: enableOfflineQueue false / maxRetriesPerRequest so commands fail fast into try/catch instead of hanging
 
 Plan: see PLAN.md. API first, then UI.
 

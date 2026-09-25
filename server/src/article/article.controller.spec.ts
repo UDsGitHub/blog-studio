@@ -9,6 +9,7 @@ import { ArticleStatus } from '../generated/prisma/client';
 import { BadRequestException } from '@nestjs/common';
 import { AuthenticatedRequest } from '../guard/authenticated-request.interface';
 import { ArticleCacheService } from './cache/article-cache.service';
+import type { Response } from 'express';
 
 const authedReq = { isAuthenticated: true } as AuthenticatedRequest;
 const anonReq = { isAuthenticated: false } as AuthenticatedRequest;
@@ -32,6 +33,7 @@ describe('ArticleController', () => {
     searchKey: jest.fn(),
     slugKey: jest.fn(),
   };
+  const response = { set: jest.fn() } as unknown as Response;
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -141,7 +143,7 @@ describe('ArticleController', () => {
         createdAt: new Date(),
       });
 
-      const response = await controller.findBySlug(authedReq, 'slug');
+      const article = await controller.findBySlug(authedReq, response, 'slug');
 
       expect(cacheService.slugKey).toHaveBeenCalledWith('slug');
       expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
@@ -150,9 +152,9 @@ describe('ArticleController', () => {
         'slug',
       );
 
-      await controller.findBySlug(anonReq, 'slug');
+      await controller.findBySlug(anonReq, response, 'slug');
       expect(articleService.findBySlug).toHaveBeenCalledWith(false, 'slug');
-      expect(cacheService.set).toHaveBeenCalledWith(expectedKey, response);
+      expect(cacheService.set).toHaveBeenCalledWith(expectedKey, article);
     });
 
     it('calls app.service.findBySlug() - public', async () => {
@@ -168,12 +170,12 @@ describe('ArticleController', () => {
         createdAt: new Date(),
       });
 
-      const response = await controller.findBySlug(anonReq, 'slug');
+      const article = await controller.findBySlug(anonReq, response, 'slug');
 
       expect(cacheService.slugKey).toHaveBeenCalledWith('slug');
       expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
       expect(articleService.findBySlug).toHaveBeenCalledWith(false, 'slug');
-      expect(cacheService.set).toHaveBeenCalledWith(expectedKey, response);
+      expect(cacheService.set).toHaveBeenCalledWith(expectedKey, article);
     });
 
     it('calls app.service.findById()', async () => {
@@ -218,10 +220,10 @@ describe('ArticleController', () => {
       cacheService.slugKey.mockResolvedValue(expectedKey);
       cacheService.get.mockResolvedValue(cacheArticle);
 
-      const response = await controller.findBySlug(authedReq, 'slug');
+      const article = await controller.findBySlug(authedReq, response, 'slug');
 
-      expect(response).toEqual(cacheArticle);
-      expect(response).not.toEqual(fetchedArticle);
+      expect(article).toEqual(cacheArticle);
+      expect(article).not.toEqual(fetchedArticle);
       expect(cacheService.slugKey).toHaveBeenCalledWith('slug');
       expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
       expect(articleService.findBySlug).not.toHaveBeenCalled();
@@ -241,12 +243,12 @@ describe('ArticleController', () => {
         createdAt: new Date(),
       });
 
-      const response = await controller.findBySlug(authedReq, 'slug');
+      const article = await controller.findBySlug(authedReq, response, 'slug');
 
       expect(cacheService.slugKey).toHaveBeenCalledWith('slug');
       expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
       expect(articleService.findBySlug).toHaveBeenCalledWith(true, 'slug');
-      expect(cacheService.set).toHaveBeenCalledWith(expectedKey, response);
+      expect(cacheService.set).toHaveBeenCalledWith(expectedKey, article);
     });
 
     it('cache is not set if cached article is DRAFT status', async () => {
@@ -272,14 +274,14 @@ describe('ArticleController', () => {
       cacheService.get.mockResolvedValue(cacheArticle);
       articleService.findBySlug.mockResolvedValue(fetchedArticle);
 
-      const response = await controller.findBySlug(authedReq, 'slug');
+      const article = await controller.findBySlug(authedReq, response, 'slug');
 
-      expect(response).not.toEqual(cacheArticle);
-      expect(response).toEqual(fetchedArticle);
+      expect(article).not.toEqual(cacheArticle);
+      expect(article).toEqual(fetchedArticle);
       expect(cacheService.slugKey).toHaveBeenCalledWith('slug');
       expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
       expect(articleService.findBySlug).toHaveBeenCalledWith(true, 'slug');
-      expect(cacheService.set).not.toHaveBeenCalledWith(expectedKey, response);
+      expect(cacheService.set).not.toHaveBeenCalledWith(expectedKey, article);
     });
 
     it('cache is not set if cached article is ARCHIVED status', async () => {
@@ -305,14 +307,14 @@ describe('ArticleController', () => {
       cacheService.get.mockResolvedValue(cacheArticle);
       articleService.findBySlug.mockResolvedValue(fetchedArticle);
 
-      const response = await controller.findBySlug(authedReq, 'slug');
+      const article = await controller.findBySlug(authedReq, response, 'slug');
 
-      expect(response).not.toEqual(cacheArticle);
-      expect(response).toEqual(fetchedArticle);
+      expect(article).not.toEqual(cacheArticle);
+      expect(article).toEqual(fetchedArticle);
       expect(cacheService.slugKey).toHaveBeenCalledWith('slug');
       expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
       expect(articleService.findBySlug).toHaveBeenCalledWith(true, 'slug');
-      expect(cacheService.set).not.toHaveBeenCalledWith(expectedKey, response);
+      expect(cacheService.set).not.toHaveBeenCalledWith(expectedKey, article);
     });
 
     it('cache is not set if fetched article is DRAFT status', async () => {
@@ -328,12 +330,12 @@ describe('ArticleController', () => {
         createdAt: new Date(),
       });
 
-      const response = await controller.findBySlug(authedReq, 'slug');
+      const article = await controller.findBySlug(authedReq, response, 'slug');
 
       expect(cacheService.slugKey).toHaveBeenCalledWith('slug');
       expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
       expect(articleService.findBySlug).toHaveBeenCalledWith(true, 'slug');
-      expect(cacheService.set).not.toHaveBeenCalledWith(expectedKey, response);
+      expect(cacheService.set).not.toHaveBeenCalledWith(expectedKey, article);
     });
 
     it('cache is not set if fetched article is ARCHIVED status', async () => {
@@ -349,12 +351,12 @@ describe('ArticleController', () => {
         createdAt: new Date(),
       });
 
-      const response = await controller.findBySlug(authedReq, 'slug');
+      const article = await controller.findBySlug(authedReq, response, 'slug');
 
       expect(cacheService.slugKey).toHaveBeenCalledWith('slug');
       expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
       expect(articleService.findBySlug).toHaveBeenCalledWith(true, 'slug');
-      expect(cacheService.set).not.toHaveBeenCalledWith(expectedKey, response);
+      expect(cacheService.set).not.toHaveBeenCalledWith(expectedKey, article);
     });
   });
 

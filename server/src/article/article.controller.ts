@@ -11,6 +11,7 @@ import {
   Query,
   Req,
   UseGuards,
+  Res,
 } from '@nestjs/common';
 import { ArticleService } from './article.service';
 import { CreateArticleDto } from './dto/create-article.dto';
@@ -30,6 +31,7 @@ import type { AuthenticatedRequest } from '../guard/authenticated-request.interf
 import { AdminOnly } from '../guard/admin-only.decorator';
 import { ArticleQueryGuard } from './guard/article-query.guard';
 import { ArticleCacheService } from './cache/article-cache.service';
+import type { Response } from 'express';
 
 @Controller('articles')
 export class ArticleController {
@@ -79,16 +81,16 @@ export class ArticleController {
       return cached;
     }
 
-    const response = await this.articleService.browse(
+    const articles = await this.articleService.browse(
       limit,
       cursorId,
       status,
       startDate,
       endDate,
     );
-    await this.cacheService.set(cacheKey, response);
+    await this.cacheService.set(cacheKey, articles);
 
-    return response;
+    return articles;
   }
 
   @Get('/search')
@@ -114,16 +116,16 @@ export class ArticleController {
       return cached;
     }
 
-    const response = await this.articleService.search(
+    const articles = await this.articleService.search(
       limit,
       search,
       status,
       startDate,
       endDate,
     );
-    await this.cacheService.set(cacheKey, response);
+    await this.cacheService.set(cacheKey, articles);
 
-    return response;
+    return articles;
   }
 
   @Get('id/:id')
@@ -137,11 +139,16 @@ export class ArticleController {
   @ApiOkResponse({ type: ArticleEntity })
   async findBySlug(
     @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
     @Param('slug') slug: string,
   ) {
     const cacheKey = await this.cacheService.slugKey(slug);
     const cached = await this.cacheService.get<Article>(cacheKey);
     if (cached && cached.status === ArticleStatus.PUBLISHED) {
+      response.set(
+        'Cache-control',
+        'public, max-age=0, s-maxage=60, stale-while-revalidate=30',
+      );
       return cached;
     }
 
@@ -153,6 +160,12 @@ export class ArticleController {
       await this.cacheService.set(cacheKey, article);
     }
 
+    response.set(
+      'Cache-control',
+      article?.status === ArticleStatus.PUBLISHED
+        ? 'public, max-age=0, s-maxage=60, stale-while-revalidate=30'
+        : 'private, no-store',
+    );
     return article;
   }
 

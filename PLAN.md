@@ -40,6 +40,7 @@ Not doing: SSE or websockets. Server-side consumers have no live client to notif
 - **Search** is full-text, top-N by relevance, with no cursor (the API rejects `cursorId` with `search`).
 - UI consequence: browsing is the list (infinite scroll), and searching is the command palette (top N results, "refine your query" footer). The two are separate tools.
 - Search results return a highlighted snippet (`ts_headline`) instead of the body.
+- **`SearchArticlesResponseDto` has no `hasMore` field** (confirmed intentional, not a side effect of a coverage-driven test pass that briefly removed it): search never paginates, so the field would always be `false` and adds nothing. The studio's search UI should not expect this field — it's an intentional asymmetry with `browse`'s `{data, hasMore}` shape, not an oversight.
 - **List ordering [open]:** `PUBLISHED` sorts by `publishedAt desc`. Other statuses sort by `createdAt desc` (or `updatedAt`, for "recently edited" drafts). The API picks the sort key from the `status` filter. `id desc` stays as the tie-breaker.
 
 

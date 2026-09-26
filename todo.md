@@ -7,11 +7,11 @@
 - [ ] discuss Redis/cache logging: instance Logger + context vs Logger.error(error); warn vs error; include op/key; avoid noisy reconnect spam
 - [x] Redis hardening: enableOfflineQueue false / maxRetriesPerRequest / connectTimeout / commandTimeout / retryStrategy so commands fail fast instead of hanging — verified live, outage now resolves in 44-68ms instead of ~73.5s (see PLAN.md §11a)
 - [x] rate limiting: @nestjs/throttler, two-tier (short/long) via @SkipThrottle — verified live, 429 + Retry-After-{name} at the configured limit (see PLAN.md §12)
-- [ ] set app.set('trust proxy', ...) in main.ts before relying on rate limiting in production (see PLAN.md §12, API4)
+- [x] set app.set('trust proxy', ...) in main.ts — done via TRUST_PROXY env var (loopback for local/CI, 1 for real dev); confirm the correct value is set as a real Railway env var before relying on rate limiting in production
 - [ ] add helmet to main.ts (see PLAN.md §12, API8)
 - [ ] add a request body size limit (see PLAN.md §12, API4)
 - [ ] test Postgres-outage graceful degradation the same way the Redis outage was tested (see PLAN.md §12, ops)
-- [ ] write dedicated e2e tests for rate limiting (own describe block, not the main app.e2e-spec.ts; see plan discussed with the architect)
+- [x] write dedicated e2e tests for rate limiting — `test/throttle.e2e-spec.ts`; found and fixed 3 real bugs during review (missing async/await meant nothing was actually being tested; malformed UUIDs from a stray `}` in 3 URLs; the search test was hitting the browse route, not /articles/search, and silently sharing its throttle bucket) — all 7 cases now genuinely pass
 
 Plan: see PLAN.md. API first, then UI.
 
@@ -31,7 +31,7 @@ Plan: see PLAN.md. API first, then UI.
 - [x] allow unpublish (PUBLISHED -> DRAFT) directly; keep DRAFT -> ARCHIVED blocked (500); publishedAt untouched by unpublish
 - [x] fix slug history to key off `publishedAt` ever set, not current status === PUBLISHED (was dropping history for renames made while unpublished/archived)
 - [ ] webhook module: signed payload, WEBHOOK_URLS env, publish-affecting events only
-- [ ] ETag + Cache-Control on list and detail
+- [x] ETag + Cache-Control on list and detail
 - [x] update tests for all of the above
 - [x] follow-up: draftToArchived now throws BadRequestException (400) instead of 500
 - [x] follow-up: AuthGuard key-length short-circuit reviewed, accepted as-is (only leaks key length, not contents)

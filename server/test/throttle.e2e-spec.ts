@@ -42,9 +42,9 @@ describe('App Throttle (e2e)', () => {
   });
 
   describe('no 429 below throttle limit', () => {
-    it('no 429 on createArticle() below throttle limit', () => {
+    it('no 429 on createArticle() below throttle limit', async () => {
       for (let i = 1; i <= 100; i++) {
-        asAdmin('post', '/articles')
+        await asAdmin('post', '/articles')
           .send({
             title: `first article - ${i}`,
             body: 'hello world',
@@ -52,7 +52,7 @@ describe('App Throttle (e2e)', () => {
           })
           .expect(201);
       }
-      asAdmin('post', '/articles')
+      await asAdmin('post', '/articles')
         .send({
           title: `first article - 101`,
           body: 'hello world',
@@ -61,54 +61,64 @@ describe('App Throttle (e2e)', () => {
         .expect(429);
     });
 
-    it('no 429 on updateArticle() below throttle limit', () => {
+    it('no 429 on updateArticle() below throttle limit', async () => {
       for (let i = 1; i <= 100; i++) {
-        asAdmin('patch', `/articles/${crypto.randomUUID()}}`)
+        await asAdmin('patch', `/articles/${crypto.randomUUID()}`)
           .send({
             status: ArticleStatus.PUBLISHED,
           })
           .expect(404);
       }
-      asAdmin('patch', `/articles/${crypto.randomUUID()}}`)
+      await asAdmin('patch', `/articles/${crypto.randomUUID()}`)
         .send({
           status: ArticleStatus.PUBLISHED,
         })
         .expect(429);
     });
 
-    it('no 429 on removeArticle() below throttle limit', () => {
+    it('no 429 on removeArticle() below throttle limit', async () => {
       for (let i = 1; i <= 100; i++) {
-        asAdmin('delete', `/articles/${crypto.randomUUID()}}`).expect(404);
+        await asAdmin('delete', `/articles/${crypto.randomUUID()}`).expect(
+          404,
+        );
       }
-      asAdmin('delete', `/articles/${crypto.randomUUID()}}`).expect(429);
+      await asAdmin('delete', `/articles/${crypto.randomUUID()}`).expect(429);
     });
 
-    it('no 429 on findById() below throttle limit', () => {
+    it('no 429 on findById() below throttle limit', async () => {
       for (let i = 1; i <= 100; i++) {
-        asAdmin('get', `/articles/id/${crypto.randomUUID()}}`).expect(404);
+        await asAdmin('get', `/articles/id/${crypto.randomUUID()}`).expect(
+          404,
+        );
       }
-      asAdmin('get', `/articles/id/${crypto.randomUUID()}}`).expect(429);
+      await asAdmin('get', `/articles/id/${crypto.randomUUID()}`).expect(429);
     });
 
-    it('no 429 on findBySlug() below throttle limit', () => {
+    it('no 429 on findBySlug() below throttle limit', async () => {
       for (let i = 1; i <= 150; i++) {
-        asPublic('get', `/articles/slug`).expect(404);
+        await asPublic('get', `/articles/slug`).expect(404);
       }
-      asPublic('get', `/articles/slug`).expect(429);
+      await asPublic('get', `/articles/slug`).expect(429);
     });
 
-    it('no 429 on browseArticles() below throttle limit', () => {
+    it('no 429 on browseArticles() below throttle limit', async () => {
       for (let i = 1; i <= 150; i++) {
-        asPublic('get', `/articles?status=PUBLISHED`).expect(200);
+        await asPublic('get', `/articles?status=PUBLISHED`).expect(200);
       }
-      asPublic('get', `/articles?status=PUBLISHED`).expect(429);
+      await asPublic('get', `/articles?status=PUBLISHED`).expect(429);
     });
 
-    it('no 429 on searchArticles() below throttle limit', () => {
+    it('no 429 on searchArticles() below throttle limit', async () => {
       for (let i = 1; i <= 150; i++) {
-        asPublic('get', `/articles?status=PUBLISHED&search=hello`).expect(200);
+        await asPublic(
+          'get',
+          `/articles/search?status=PUBLISHED&search=hello`,
+        ).expect(200);
       }
-      asPublic('get', `/articles?status=PUBLISHED&search=hello`).expect(429);
+      await asPublic(
+        'get',
+        `/articles/search?status=PUBLISHED&search=hello`,
+      ).expect(429);
     });
   });
 });

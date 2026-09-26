@@ -1,11 +1,17 @@
 - [ ] start buidling out frontend
-- [ ] add redis caching to the backend
+- [x] add redis caching to the backend
 - [x] update unit tests and e2e tests based on current checked changes for API 
 - [x] include excerpt in select for non-search article list and exclude body. derive excerpt from body if excerpt is empty
 - [x] env file for container seems to be using my regular env not test env... adding envfilepath in app module gets the test env in for docker, but when i run the app, it uses test env instead of regular env
 - [ ] figure out appropriate TTLs for cache keys
 - [ ] discuss Redis/cache logging: instance Logger + context vs Logger.error(error); warn vs error; include op/key; avoid noisy reconnect spam
-- [ ] optional Redis hardening: enableOfflineQueue false / maxRetriesPerRequest so commands fail fast into try/catch instead of hanging
+- [x] Redis hardening: enableOfflineQueue false / maxRetriesPerRequest / connectTimeout / commandTimeout / retryStrategy so commands fail fast instead of hanging — verified live, outage now resolves in 44-68ms instead of ~73.5s (see PLAN.md §11a)
+- [x] rate limiting: @nestjs/throttler, two-tier (short/long) via @SkipThrottle — verified live, 429 + Retry-After-{name} at the configured limit (see PLAN.md §12)
+- [ ] set app.set('trust proxy', ...) in main.ts before relying on rate limiting in production (see PLAN.md §12, API4)
+- [ ] add helmet to main.ts (see PLAN.md §12, API8)
+- [ ] add a request body size limit (see PLAN.md §12, API4)
+- [ ] test Postgres-outage graceful degradation the same way the Redis outage was tested (see PLAN.md §12, ops)
+- [ ] write dedicated e2e tests for rate limiting (own describe block, not the main app.e2e-spec.ts; see plan discussed with the architect)
 
 Plan: see PLAN.md. API first, then UI.
 

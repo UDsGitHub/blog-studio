@@ -2,16 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.enableShutdownHooks();
   app.enableCors({
+    methods: ['GET', 'PATCH', 'POST', 'DELETE'],
     origin: (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
       .split(',')
       .map((origin) => origin.trim()),
   });
+  app.set('trust proxy', process.env.TRUST_PROXY ?? 'loopback');
+
   const config = new DocumentBuilder()
     .setTitle('Article API')
     .setDescription('The headless article service')

@@ -211,7 +211,9 @@ They funnel: RTK Query → HTTP conditional request → Redis → Postgres, each
 
 **`findBySlug` caching is gated on the article's actual status, not on `isAuthenticated`.** Only a `PUBLISHED` result is ever written to or served from cache; a `DRAFT`/`ARCHIVED` result always goes straight to `articleService.findBySlug`, which still does its own 404 gating for unauthenticated callers. This means the cache never holds non-public content, which is a stronger guarantee than gating on the caller's auth would have been.
 
-**Known limitation, accepted:** `bumpVersion()` is a read-then-write (`get` the version, `set` version+1), not an atomic Redis `INCR` — the generic `Cache` interface from `@nestjs/cache-manager` doesn't expose atomic increment across arbitrary stores. Two saves landing in the same few milliseconds could lose an increment. For a single-author tool this is very low risk (verified live: create → browse → update → browse showed the edit immediately, versions `v2`→`v3` as expected). Not fixed now; if it ever matters, the fix is a raw Redis client (e.g. `ioredis`) used only for this one counter.
+**Resolved:** the cache layer was later migrated off `@nestjs/cache-manager`/`@keyv/redis` onto a raw `ioredis` client (`RedisService extends Redis`), and `bumpVersion()` now calls `redis.incr()` directly — genuinely atomic, not read-then-write. This closes what was originally logged here as an accepted, low-risk limitation.
+
+**Resolved: Redis-outage resilience.** Every `ArticleCacheService` method (`get`, `set`, `bumpVersion`) is wrapped in try/catch and fails open (treated as a cache miss, falls through to Postgres) — but the underlying `ioredis` calls needed to actually *fail fast* for that to matter in practice. This took real investigation: `maxRetriesPerRequest`, `enableOfflineQueue: false`, and `commandTimeout` were each tried and verified live (stop the Redis container, time a request) with no effect — a request still took ~73.5 seconds before erroring, consistently, across every configuration tried, including one where a hand-rolled `Promise.race`-style timeout independent of `ioredis`'s internals *also* didn't help, which proved the delay wasn't even reaching the cache-service code in the way it appeared to. Root cause (per a separate debugging pass, cross-checked live): `ioredis` was sitting in its offline/reconnect queue rather than rejecting immediately, so none of the fail-fast options got a chance to apply. Fix: `enableOfflineQueue: false` now genuinely rejects immediately while disconnected (`connectTimeout`/`commandTimeout` bound the black-holed-TCP case, `retryStrategy` keeps auto-recovery working). Verified live, repeatedly: outage → next request resolves in **44–68ms** instead of ~73.5s/500, including after Redis had already been down for 8+ seconds; Redis restored → immediate recovery, **no app restart needed**.
 
 **Still open:** `- [ ] figure out appropriate TTLs for cache keys` (todo.md) — currently a flat 60s (`60_000`, confirmed empirically to be milliseconds, not seconds) for every key shape.
 
@@ -220,3 +222,37 @@ They funnel: RTK Query → HTTP conditional request → Redis → Postgres, each
 - [x] `draftToArchived` now throws `BadRequestException` (400), not 500 — fixed, tests updated (unit + e2e).
 - [x] `AuthGuard`'s length short-circuit before `timingSafeEqual`: accepted as-is. It only leaks `API_KEY`'s length, not its contents, which is what `timingSafeEqual` actually protects; not worth the extra complexity for a single-user key.
 - [x] `browseArticles`/`searchArticles` deduped: extracted into `ArticleQueryGuard` (`src/article/article-query.guard.ts`), applied via `@UseGuards` on both routes, with its own unit spec. Reads raw `request.query` (pre-`ValidationPipe`, since guards run before pipes) — fine here since it only does string equality/truthiness checks, not date parsing; a repeated query param (`?status=A&status=B`) would slip past this guard as an array but gets rejected by the DTO's `@IsEnum` validation right after, so no real gap.
+
+## 12. Production readiness checklist
+
+Structured around the OWASP API Security Top 10, plus an ops column for concerns that framework doesn't cover. Status is honest, not aspirational — "Open" means genuinely not done, not "low priority so we're calling it done."
+
+This section exists because it should have existed from the start: security and reliability work happened reactively, thread by thread (design the auth guard → fix a bug → add caching → debug an outage), without a standing list run across categories. That's how rate limiting went unmentioned until asked for directly, despite "Broken Authentication" and "Unrestricted Resource Consumption" being adjacent-but-distinct OWASP categories. This list is the fix for that: scan it, don't wait to be asked.
+
+### Security (OWASP API Security Top 10)
+
+| Category | Status | Note |
+|---|---|---|
+| API2 Broken Authentication | Covered | API key guard, `timingSafeEqual` comparison, key storage guidance (§7) |
+| API3 Excessive Data Exposure / Mass Assignment | Covered | `ValidationPipe({ whitelist: true })` blocks unexpected fields on create/update |
+| API4 Unrestricted Resource Consumption | **Covered** | `@nestjs/throttler`, two named throttlers (`short`/`long`) with route-level `@SkipThrottle` tiers — verified live: exactly the configured limit succeeds, the next request gets `429` with a `Retry-After-{name}` header and a `ThrottlerException` body. Pagination `limit` is separately capped (`@Max(100)`). **Open sub-item:** `app.set('trust proxy', ...)` is not configured in `main.ts`. Without it, `req.ip` behind Railway's proxy will resolve to Railway's internal address for every request, meaning the limit is shared across *all* visitors combined rather than enforced per-visitor. This must be set (and verified against Railway's actual proxy depth) before the limit means anything in production. **Also open:** request body size limits — `body`/`excerpt` have no server-side cap besides `excerpt`'s `@MaxLength(300)`; `body` is unbounded. |
+| API5 Broken Function-Level Authorization | Covered | `@AdminOnly` guard on mutating/admin routes |
+| API6 Unrestricted Access to Sensitive Business Flows | Covered | same throttler tiers apply to create/update/delete |
+| API7 SSRF | Not yet relevant | becomes relevant once Cloudinary image upload lands (fetching remote URLs) — revisit then |
+| API8 Security Misconfiguration | **Open** | no `helmet` in `main.ts` (no `X-Content-Type-Options`, `X-Frame-Options`, CSP, etc.); haven't confirmed Nest suppresses stack traces in production error responses |
+| API1/API9/API10 (object-level authz, inventory mgmt, unsafe API consumption) | Not applicable / low priority | single-tenant, no per-user ownership model; no third-party APIs consumed yet |
+
+### Ops / reliability
+
+| Area | Status | Note |
+|---|---|---|
+| Health check | **Covered** | `/health` now pings both Postgres (Prisma) and Redis (`RedisHealthIndicator`) — verified live, returns `{"database":{"status":"up"},"redis":{"status":"up"}}` |
+| DB-outage graceful degradation | **Open, unverified** | the Redis-outage investigation proved fail-open works there; nobody has yet tested what happens to a request if *Postgres* — the actual source of truth — is unreachable. Given how wrong the initial assumptions about Redis's default behavior turned out to be, this should be tested the same way (stop the DB container, time a request), not assumed |
+| Production migrations | **Covered** | Railway predeploy script runs `prisma migrate deploy`; the `migrate` compose service is for local dev only |
+| Backups | **Accepted risk, budget-constrained** | Railway managed Postgres backups require the Pro plan. Deferred deliberately, not overlooked — if this needs relaying to a stakeholder, the answer is "budget constraint, not an oversight," and it should be revisited if/when the plan changes |
+| Error visibility | Open, deferred | no error-tracking service (Sentry or similar); exceptions are only visible via container logs. Fine at current scale, worth naming explicitly rather than leaving unnoticed |
+| CI | Covered | `.github/workflows/ci-main.yml` runs lint/typecheck/unit/e2e with real Postgres + Redis services |
+
+### A note on dev environment hygiene
+
+Unrelated to the app itself, but worth recording: the local dev container (`nest start --watch` under `docker compose`) has intermittently failed to rebind port 3000 on a file-change restart (`EADDRINUSE`), silently leaving a *stale* process serving requests while looking like a healthy, up-to-date container — this cost real debugging time more than once (it's what made the rate limiter look broken during initial verification, before a full `docker compose down && up --build` proved it was working correctly all along). When live-testing anything in this container and the result looks wrong or inconsistent, a full recreate — not just a hot-reload — should be the first troubleshooting step, not the last.

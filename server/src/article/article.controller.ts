@@ -32,6 +32,7 @@ import { AdminOnly } from '../guard/admin-only.decorator';
 import { ArticleQueryGuard } from './guard/article-query.guard';
 import { ArticleCacheService } from './cache/article-cache.service';
 import type { Response } from 'express';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('articles')
 export class ArticleController {
@@ -40,6 +41,7 @@ export class ArticleController {
     private cacheService: ArticleCacheService,
   ) {}
 
+  @SkipThrottle({ short: true })
   @Post()
   @AdminOnly(true)
   async createArticle(
@@ -58,6 +60,7 @@ export class ArticleController {
     return response;
   }
 
+  @SkipThrottle({ long: true })
   @Get()
   @UseGuards(ArticleQueryGuard)
   @ApiOkResponse({
@@ -93,6 +96,7 @@ export class ArticleController {
     return articles;
   }
 
+  @SkipThrottle({ long: true })
   @Get('/search')
   @UseGuards(ArticleQueryGuard)
   @ApiOkResponse({
@@ -128,6 +132,7 @@ export class ArticleController {
     return articles;
   }
 
+  @SkipThrottle({ short: true })
   @Get('id/:id')
   @AdminOnly(true)
   @ApiOkResponse({ type: ArticleEntity })
@@ -135,6 +140,7 @@ export class ArticleController {
     return this.articleService.findById(id);
   }
 
+  @SkipThrottle({ long: true })
   @Get(':slug')
   @ApiOkResponse({ type: ArticleEntity })
   async findBySlug(
@@ -169,6 +175,7 @@ export class ArticleController {
     return article;
   }
 
+  @SkipThrottle({ short: true })
   @Patch(':id')
   @AdminOnly(true)
   @ApiOkResponse({ type: ArticleEntity })
@@ -196,6 +203,7 @@ export class ArticleController {
     return response;
   }
 
+  @SkipThrottle({ short: true })
   @Delete(':id')
   @AdminOnly(true)
   @ApiOkResponse({ type: ArticleEntity })

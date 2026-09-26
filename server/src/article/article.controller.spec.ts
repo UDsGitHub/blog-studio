@@ -95,6 +95,7 @@ describe('ArticleController', () => {
       const response = await controller.searchArticles({
         search: 'search',
         limit: 25,
+        status: ArticleStatus.PUBLISHED,
       });
 
       expect(cacheService.searchKey).toHaveBeenCalled();
@@ -102,7 +103,7 @@ describe('ArticleController', () => {
       expect(articleService.search).toHaveBeenCalledWith(
         25,
         'search',
-        undefined,
+        ArticleStatus.PUBLISHED,
         undefined,
         undefined,
       );
@@ -358,6 +359,50 @@ describe('ArticleController', () => {
       expect(articleService.findBySlug).toHaveBeenCalledWith(true, 'slug');
       expect(cacheService.set).not.toHaveBeenCalledWith(expectedKey, article);
     });
+
+    it('browseArticles() returns cached value if set', async () => {
+      const expectedKey =
+        'articles:v1:browse:25:undefined:undefined:undefined:undefined';
+      const expectedValue = {
+        data: [],
+        hasMore: false,
+      };
+
+      cacheService.browseKey.mockResolvedValue(expectedKey);
+      cacheService.get.mockResolvedValue(expectedValue);
+
+      const response = await controller.browseArticles({ limit: 25 });
+
+      expect(cacheService.browseKey).toHaveBeenCalled();
+      expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
+      expect(response).toEqual(expectedValue);
+      expect(articleService.browse).not.toHaveBeenCalled();
+      expect(cacheService.set).not.toHaveBeenCalled();
+    });
+
+    it('searchArticles() returns cached value if set', async () => {
+      const expectedKey =
+        'articles:v1:search:25:search:PUBLISHED:undefined:undefined';
+      const expectedValue = {
+        data: [],
+        hasMore: false,
+      };
+
+      cacheService.searchKey.mockResolvedValue(expectedKey);
+      cacheService.get.mockResolvedValue(expectedValue);
+
+      const response = await controller.searchArticles({
+        search: 'search',
+        limit: 25,
+        status: ArticleStatus.PUBLISHED,
+      });
+
+      expect(cacheService.searchKey).toHaveBeenCalled();
+      expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
+      expect(response).toEqual(expectedValue);
+      expect(articleService.browse).not.toHaveBeenCalled();
+      expect(cacheService.set).not.toHaveBeenCalled();
+    });
   });
 
   describe('edge cases', () => {
@@ -371,6 +416,14 @@ describe('ArticleController', () => {
       ).rejects.toThrow(BadRequestException);
 
       expect(articleService.create).not.toHaveBeenCalled();
+    });
+
+    it('throws 400 when updating an article with no update fields specified', async () => {
+      await expect(
+        controller.updateArticle(crypto.randomUUID(), {}),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(articleService.update).not.toHaveBeenCalled();
     });
   });
 });

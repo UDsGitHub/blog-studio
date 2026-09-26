@@ -24,6 +24,13 @@ describe('Article Cache Service', () => {
     expect(redis.incr).toHaveBeenCalledWith(versionKey);
   });
 
+  it('bumpVersion calls increments with fallback 0', async () => {
+    redis.get.mockResolvedValue(null);
+    redis.incr.mockResolvedValue(1);
+    await service.bumpVersion();
+    expect(redis.incr).toHaveBeenCalledWith(versionKey);
+  });
+
   it('bumpVersion swallows redis errors', async () => {
     redis.incr.mockRejectedValue(new Error('redis down'));
     await expect(service.bumpVersion()).resolves.toBeUndefined();
@@ -69,6 +76,16 @@ describe('Article Cache Service', () => {
       JSON.stringify([{ title: 'title', body: 'body' }]),
       'EX',
       TTL,
+    );
+  });
+
+  it('set calls redis.set() with ttl', async () => {
+    await service.set('key', [{ title: 'title', body: 'body' }], 10);
+    expect(redis.set).toHaveBeenCalledWith(
+      'key',
+      JSON.stringify([{ title: 'title', body: 'body' }]),
+      'EX',
+      10,
     );
   });
 

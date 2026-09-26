@@ -8,7 +8,6 @@ import {
   IsEnum,
   IsDate,
   IsArray,
-  IsBoolean,
   IsNotEmpty,
 } from 'class-validator';
 import { ArticleStatus } from '../../generated/prisma/enums';
@@ -47,7 +46,4 @@ export class SearchArticlesResponseDto {
   @ApiProperty({ type: [ArticleSearchPreviewEntity] })
   @IsArray()
   data: ArticleSearchPreview[] = [];
-
-  @IsBoolean()
-  hasMore: boolean = false;
 }

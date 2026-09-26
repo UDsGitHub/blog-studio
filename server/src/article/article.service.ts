@@ -77,9 +77,6 @@ export class ArticleService {
       }
 
       article = await this.findById(slugHistoryRecord.articleId);
-      if (!article) {
-        throw new NotFoundException(`Article with slug: ${slug} not found`);
-      }
     }
 
     if (
@@ -111,7 +108,6 @@ export class ArticleService {
     const updateData = { ...updateArticleDto };
 
     const article = await this.findById(id);
-    // set publishedAt once if article switches from draft to published
     const draftToPublished =
       updateData?.status === ArticleStatus.PUBLISHED &&
       article.status === ArticleStatus.DRAFT;
@@ -119,8 +115,6 @@ export class ArticleService {
       updateData['publishedAt'] = new Date();
     }
 
-    // draft can only reach archived by way of published, so an archived
-    // article always has a publishedAt to order and filter by
     const draftToArchived =
       updateData?.status === ArticleStatus.ARCHIVED &&
       article.status === ArticleStatus.DRAFT;
@@ -134,8 +128,6 @@ export class ArticleService {
     if (updateArticleDto.title) {
       const updatedSlug = await this.getSlug(updateArticleDto.title, id);
       updateData['slug'] = updatedSlug;
-      // record slug history for any article that has ever been public,
-      // regardless of its current status, so old links keep redirecting
       if (article?.publishedAt) {
         await this.prisma.articleSlugHistory.create({
           data: { articleId: article.id, slug: article.slug },
@@ -284,9 +276,9 @@ export class ArticleService {
             a.created_at desc, 
             a.id desc 
           limit ${limit};`;
+
     return {
       data: results,
-      hasMore: false,
     };
   }
 

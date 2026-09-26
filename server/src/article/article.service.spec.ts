@@ -23,6 +23,7 @@ describe('ArticleService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
     },
+    $queryRaw: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -234,204 +235,563 @@ describe('ArticleService', () => {
       });
     });
 
-    it('returns all articles - no filters', async () => {
-      const expectedArticles = [
-        {
-          id: '1',
-          title: 'title',
-          slug: 'title',
-          status: ArticleStatus.DRAFT,
-          excerpt: 'body',
-          body: 'body',
-          createdAt: new Date(),
-        },
-        {
-          id: '2',
-          title: 'title',
-          slug: 'title-1',
-          status: ArticleStatus.DRAFT,
-          excerpt: '',
-          body: 'body',
-          createdAt: new Date(),
-        },
-      ];
-      prisma.article.findMany.mockResolvedValue(expectedArticles);
+    it('returns 404 if slug not found in slug history table', async () => {
+      const articleSlug = 'slug';
 
-      const response = await service.browse(25);
+      prisma.article.findUnique.mockResolvedValueOnce(null);
+      prisma.articleSlugHistory.findUnique.mockResolvedValueOnce(null);
 
-      expect(prisma.article.findMany).toHaveBeenCalledWith({
-        where: {},
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: 25 + 1,
-      });
-      expect(response.data[0]).toEqual({
-        id: expectedArticles[0].id,
-        title: expectedArticles[0].title,
-        slug: expectedArticles[0].slug,
-        status: expectedArticles[0].status,
-        excerpt: expectedArticles[0].excerpt,
-        createdAt: expectedArticles[0].createdAt,
-      });
-      expect(response.data[1]).toEqual({
-        id: expectedArticles[1].id,
-        title: expectedArticles[1].title,
-        slug: expectedArticles[1].slug,
-        status: expectedArticles[1].status,
-        excerpt: expectedArticles[1].body,
-        createdAt: expectedArticles[1].createdAt,
-      });
-    });
-
-    it('returns all articles - filters: [cursorId]', async () => {
-      const expectedArticles = [
-        {
-          id: '1',
-          title: 'title',
-          slug: 'title',
-          body: 'body',
-          createdAt: 1788970361746,
-        },
-        {
-          id: '2',
-          title: 'title',
-          slug: 'title-1',
-          body: 'body',
-          createdAt: 1788970361747,
-        },
-      ];
-      prisma.article.findMany.mockResolvedValue(expectedArticles);
-
-      await service.browse(25, 'uuid');
-
-      expect(prisma.article.findMany).toHaveBeenCalledWith({
-        where: {},
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: 25 + 1,
-        cursor: { id: 'uuid' },
-        skip: 1,
-      });
-    });
-
-    it('returns all articles - filters: [cursorId, status<DRAFT>]', async () => {
-      const expectedArticles = [
-        {
-          id: '1',
-          title: 'title',
-          slug: 'title',
-          body: 'body',
-          createdAt: 1788970361746,
-        },
-        {
-          id: '2',
-          title: 'title',
-          slug: 'title-1',
-          body: 'body',
-          createdAt: 1788970361747,
-        },
-      ];
-      prisma.article.findMany.mockResolvedValue(expectedArticles);
-
-      await service.browse(25, 'uuid', ArticleStatus.DRAFT);
-
-      expect(prisma.article.findMany).toHaveBeenCalledWith({
-        where: { status: ArticleStatus.DRAFT },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: 25 + 1,
-        cursor: { id: 'uuid' },
-        skip: 1,
-      });
-    });
-
-    it('returns all articles - filters: [cursorId, status<PUBLISHED>, startDate]', async () => {
-      const expectedArticles = [
-        {
-          id: '1',
-          title: 'title',
-          slug: 'title',
-          excerpt: '',
-          createdAt: 1788970361746,
-        },
-        {
-          id: '2',
-          title: 'title',
-          slug: 'title-1',
-          excerpt: '',
-          createdAt: 1788970361747,
-        },
-      ];
-      const expected = {
-        data: expectedArticles,
-        hasMore: false,
-      };
-      prisma.article.findMany.mockResolvedValue(expectedArticles);
-
-      const startDate = new Date();
-      const returnValue = await service.browse(
-        25,
-        'uuid',
-        ArticleStatus.PUBLISHED,
-        startDate,
+      await expect(service.findBySlug(true, articleSlug)).rejects.toThrow(
+        NotFoundException,
       );
-
-      expect(prisma.article.findMany).toHaveBeenCalledWith({
+      expect(prisma.articleSlugHistory.findUnique).toHaveBeenCalledWith({
         where: {
-          status: ArticleStatus.PUBLISHED,
-          publishedAt: { gte: startDate },
+          slug: articleSlug,
         },
-        orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
-        take: 25 + 1,
-        cursor: { id: 'uuid' },
-        skip: 1,
+        select: {
+          articleId: true,
+        },
       });
-      expect(returnValue).toEqual(expected);
-      expect(returnValue.data).toHaveLength(2);
     });
 
-    it('returns all articles - filters: [cursorId, status<PUBLISHED>, startDate, endDate]', async () => {
-      const expectedArticles = [
-        {
-          id: '1',
-          title: 'title',
-          slug: 'title',
-          excerpt: '',
-          createdAt: 1788970361746,
-        },
-        {
-          id: '2',
-          title: 'title',
-          slug: 'title-1',
-          excerpt: '',
-          createdAt: 1788970361747,
-        },
-      ];
-      const expected = {
-        data: expectedArticles,
-        hasMore: false,
-      };
-      prisma.article.findMany.mockResolvedValue(expectedArticles);
+    it('returns 404 if slug not found in slug history and article table by id', async () => {
+      const articleSlug = 'slug';
 
-      const startDate = new Date('2026-09-19');
-      const endDate = new Date('2026-09-20');
-      const returnValue = await service.browse(
-        25,
-        'uuid',
-        ArticleStatus.PUBLISHED,
-        startDate,
-        endDate,
-      );
-
-      expect(prisma.article.findMany).toHaveBeenCalledWith({
-        where: {
-          status: ArticleStatus.PUBLISHED,
-          publishedAt: { gte: startDate, lte: endDate },
-        },
-        orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
-        take: 25 + 1,
-        cursor: { id: 'uuid' },
-        skip: 1,
+      prisma.article.findUnique.mockResolvedValueOnce(null);
+      prisma.articleSlugHistory.findUnique.mockResolvedValueOnce({
+        articleId: 'id',
+        slug: 'other-slug',
       });
-      expect(returnValue).toEqual(expected);
-      expect(returnValue.data).toHaveLength(2);
+      prisma.article.findUnique.mockResolvedValueOnce(null);
+
+      await expect(service.findBySlug(true, articleSlug)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.article.findUnique).toHaveBeenNthCalledWith(1, {
+        where: {
+          slug: articleSlug,
+        },
+      });
+      expect(prisma.articleSlugHistory.findUnique).toHaveBeenCalledWith({
+        where: {
+          slug: articleSlug,
+        },
+        select: {
+          articleId: true,
+        },
+      });
+      expect(prisma.article.findUnique).toHaveBeenNthCalledWith(2, {
+        where: {
+          id: 'id',
+        },
+      });
+    });
+
+    describe('browse articles', () => {
+      it('returns all articles - no filters', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            status: ArticleStatus.DRAFT,
+            excerpt: 'body',
+            body: 'body',
+            createdAt: new Date(),
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            status: ArticleStatus.DRAFT,
+            excerpt: '',
+            body: 'body',
+            createdAt: new Date(),
+          },
+        ];
+        prisma.article.findMany.mockResolvedValue(expectedArticles);
+
+        const response = await service.browse(25);
+
+        expect(prisma.article.findMany).toHaveBeenCalledWith({
+          where: {},
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 25 + 1,
+        });
+        expect(response.data[0]).toEqual({
+          id: expectedArticles[0].id,
+          title: expectedArticles[0].title,
+          slug: expectedArticles[0].slug,
+          status: expectedArticles[0].status,
+          excerpt: expectedArticles[0].excerpt,
+          createdAt: expectedArticles[0].createdAt,
+        });
+        expect(response.data[1]).toEqual({
+          id: expectedArticles[1].id,
+          title: expectedArticles[1].title,
+          slug: expectedArticles[1].slug,
+          status: expectedArticles[1].status,
+          excerpt: expectedArticles[1].body,
+          createdAt: expectedArticles[1].createdAt,
+        });
+      });
+
+      it('returns all articles - filters: [cursorId]', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            body: 'body',
+            createdAt: 1788970361746,
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            body: 'body',
+            createdAt: 1788970361747,
+          },
+        ];
+        prisma.article.findMany.mockResolvedValue(expectedArticles);
+
+        await service.browse(25, 'uuid');
+
+        expect(prisma.article.findMany).toHaveBeenCalledWith({
+          where: {},
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 25 + 1,
+          cursor: { id: 'uuid' },
+          skip: 1,
+        });
+      });
+
+      it('returns all articles - filters: [cursorId, status<DRAFT>]', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            body: 'body',
+            createdAt: 1788970361746,
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            body: 'body',
+            createdAt: 1788970361747,
+          },
+        ];
+        prisma.article.findMany.mockResolvedValue(expectedArticles);
+
+        await service.browse(25, 'uuid', ArticleStatus.DRAFT);
+
+        expect(prisma.article.findMany).toHaveBeenCalledWith({
+          where: { status: ArticleStatus.DRAFT },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 25 + 1,
+          cursor: { id: 'uuid' },
+          skip: 1,
+        });
+      });
+
+      it('returns all articles - filters: [cursorId, status<PUBLISHED>, startDate]', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            excerpt: '',
+            createdAt: 1788970361746,
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            excerpt: '',
+            createdAt: 1788970361747,
+          },
+        ];
+        const expected = {
+          data: expectedArticles,
+          hasMore: false,
+        };
+        prisma.article.findMany.mockResolvedValue(expectedArticles);
+
+        const startDate = new Date();
+        const returnValue = await service.browse(
+          25,
+          'uuid',
+          ArticleStatus.PUBLISHED,
+          startDate,
+        );
+
+        expect(prisma.article.findMany).toHaveBeenCalledWith({
+          where: {
+            status: ArticleStatus.PUBLISHED,
+            publishedAt: { gte: startDate },
+          },
+          orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+          take: 25 + 1,
+          cursor: { id: 'uuid' },
+          skip: 1,
+        });
+        expect(returnValue).toEqual(expected);
+        expect(returnValue.data).toHaveLength(2);
+      });
+
+      it('returns all articles - filters: [cursorId, status<PUBLISHED>, startDate, undefined]', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            excerpt: '',
+            createdAt: 1788970361746,
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            excerpt: '',
+            createdAt: 1788970361747,
+          },
+        ];
+        const expected = {
+          data: expectedArticles,
+          hasMore: false,
+        };
+        prisma.article.findMany.mockResolvedValue(expectedArticles);
+
+        const startDate = new Date('2026-09-19');
+        const returnValue = await service.browse(
+          25,
+          'uuid',
+          ArticleStatus.PUBLISHED,
+          startDate,
+        );
+
+        expect(prisma.article.findMany).toHaveBeenCalledWith({
+          where: {
+            status: ArticleStatus.PUBLISHED,
+            publishedAt: { gte: startDate },
+          },
+          orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+          take: 25 + 1,
+          cursor: { id: 'uuid' },
+          skip: 1,
+        });
+        expect(returnValue).toEqual(expected);
+        expect(returnValue.data).toHaveLength(2);
+      });
+
+      it('returns all articles - filters: [cursorId, status<PUBLISHED>, undefined, endDate]', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            excerpt: '',
+            createdAt: 1788970361746,
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            excerpt: '',
+            createdAt: 1788970361747,
+          },
+        ];
+        const expected = {
+          data: expectedArticles,
+          hasMore: false,
+        };
+        prisma.article.findMany.mockResolvedValue(expectedArticles);
+
+        const endDate = new Date('2026-09-20');
+        const returnValue = await service.browse(
+          25,
+          'uuid',
+          ArticleStatus.PUBLISHED,
+          undefined,
+          endDate,
+        );
+
+        expect(prisma.article.findMany).toHaveBeenCalledWith({
+          where: {
+            status: ArticleStatus.PUBLISHED,
+            publishedAt: { lte: endDate },
+          },
+          orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+          take: 25 + 1,
+          cursor: { id: 'uuid' },
+          skip: 1,
+        });
+        expect(returnValue).toEqual(expected);
+        expect(returnValue.data).toHaveLength(2);
+      });
+
+      it('returns all articles - filters: [cursorId, status<PUBLISHED>, startDate, endDate]', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            excerpt: '',
+            createdAt: 1788970361746,
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            excerpt: '',
+            createdAt: 1788970361747,
+          },
+        ];
+        const expected = {
+          data: expectedArticles,
+          hasMore: false,
+        };
+        prisma.article.findMany.mockResolvedValue(expectedArticles);
+
+        const startDate = new Date('2026-09-19');
+        const endDate = new Date('2026-09-20');
+        const returnValue = await service.browse(
+          25,
+          'uuid',
+          ArticleStatus.PUBLISHED,
+          startDate,
+          endDate,
+        );
+
+        expect(prisma.article.findMany).toHaveBeenCalledWith({
+          where: {
+            status: ArticleStatus.PUBLISHED,
+            publishedAt: { gte: startDate, lte: endDate },
+          },
+          orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+          take: 25 + 1,
+          cursor: { id: 'uuid' },
+          skip: 1,
+        });
+        expect(returnValue).toEqual(expected);
+        expect(returnValue.data).toHaveLength(2);
+      });
+    });
+
+    describe('search articles', () => {
+      it('returns articles - no filters', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            status: ArticleStatus.PUBLISHED,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            headline: '',
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            status: ArticleStatus.PUBLISHED,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            headline: '',
+          },
+        ];
+        prisma.$queryRaw.mockResolvedValue(expectedArticles);
+
+        const response = await service.search(25, 'body');
+
+        expect(prisma.$queryRaw).toHaveBeenCalled();
+        expect(response).toEqual({
+          data: expect.arrayContaining([]) as [],
+        });
+        expect(response.data[0]).toEqual({
+          id: expectedArticles[0].id,
+          title: expectedArticles[0].title,
+          slug: expectedArticles[0].slug,
+          status: expectedArticles[0].status,
+          createdAt: expectedArticles[0].createdAt,
+          updatedAt: expectedArticles[0].updatedAt,
+          headline: expectedArticles[0].headline,
+        });
+        expect(response.data[1]).toEqual({
+          id: expectedArticles[1].id,
+          title: expectedArticles[1].title,
+          slug: expectedArticles[1].slug,
+          status: expectedArticles[1].status,
+          createdAt: expectedArticles[1].createdAt,
+          updatedAt: expectedArticles[1].updatedAt,
+          headline: expectedArticles[1].headline,
+        });
+      });
+
+      it('returns articles - filters: [status<DRAFT>]', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            status: ArticleStatus.PUBLISHED,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            headline: '',
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            status: ArticleStatus.PUBLISHED,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            headline: '',
+          },
+        ];
+        prisma.$queryRaw.mockResolvedValue(expectedArticles);
+
+        const response = await service.search(
+          25,
+          'body',
+          ArticleStatus.PUBLISHED,
+        );
+
+        expect(prisma.$queryRaw).toHaveBeenCalled();
+        expect(response).toEqual({
+          data: expect.arrayContaining([]) as [],
+        });
+        expect(response.data[0]).toEqual({
+          id: expectedArticles[0].id,
+          title: expectedArticles[0].title,
+          slug: expectedArticles[0].slug,
+          status: expectedArticles[0].status,
+          createdAt: expectedArticles[0].createdAt,
+          updatedAt: expectedArticles[0].updatedAt,
+          headline: expectedArticles[0].headline,
+        });
+        expect(response.data[1]).toEqual({
+          id: expectedArticles[1].id,
+          title: expectedArticles[1].title,
+          slug: expectedArticles[1].slug,
+          status: expectedArticles[1].status,
+          createdAt: expectedArticles[1].createdAt,
+          updatedAt: expectedArticles[1].updatedAt,
+          headline: expectedArticles[1].headline,
+        });
+      });
+
+      it('returns all articles - filters: [cursorId, status<PUBLISHED>, startDate, endDate]', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            status: ArticleStatus.PUBLISHED,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            headline: '',
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            status: ArticleStatus.PUBLISHED,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            headline: '',
+          },
+        ];
+        prisma.$queryRaw.mockResolvedValue(expectedArticles);
+
+        const response = await service.search(
+          25,
+          'body',
+          ArticleStatus.PUBLISHED,
+          new Date(),
+          new Date(),
+        );
+
+        expect(prisma.$queryRaw).toHaveBeenCalled();
+        expect(response).toEqual({
+          data: expect.arrayContaining([]) as [],
+        });
+        expect(response.data[0]).toEqual({
+          id: expectedArticles[0].id,
+          title: expectedArticles[0].title,
+          slug: expectedArticles[0].slug,
+          status: expectedArticles[0].status,
+          createdAt: expectedArticles[0].createdAt,
+          updatedAt: expectedArticles[0].updatedAt,
+          headline: expectedArticles[0].headline,
+        });
+        expect(response.data[1]).toEqual({
+          id: expectedArticles[1].id,
+          title: expectedArticles[1].title,
+          slug: expectedArticles[1].slug,
+          status: expectedArticles[1].status,
+          createdAt: expectedArticles[1].createdAt,
+          updatedAt: expectedArticles[1].updatedAt,
+          headline: expectedArticles[1].headline,
+        });
+      });
+
+      it('returns all articles - filters: [cursorId, status<DRAFT>, startDate, endDate]', async () => {
+        const expectedArticles = [
+          {
+            id: '1',
+            title: 'title',
+            slug: 'title',
+            status: ArticleStatus.DRAFT,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            headline: '',
+          },
+          {
+            id: '2',
+            title: 'title',
+            slug: 'title-1',
+            status: ArticleStatus.DRAFT,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            headline: '',
+          },
+        ];
+        prisma.$queryRaw.mockResolvedValue(expectedArticles);
+
+        const response = await service.search(
+          25,
+          'body',
+          ArticleStatus.DRAFT,
+          new Date(),
+          new Date(),
+        );
+
+        expect(prisma.$queryRaw).toHaveBeenCalled();
+        expect(response).toEqual({
+          data: expect.arrayContaining([]) as [],
+        });
+        expect(response.data[0]).toEqual({
+          id: expectedArticles[0].id,
+          title: expectedArticles[0].title,
+          slug: expectedArticles[0].slug,
+          status: expectedArticles[0].status,
+          createdAt: expectedArticles[0].createdAt,
+          updatedAt: expectedArticles[0].updatedAt,
+          headline: expectedArticles[0].headline,
+        });
+        expect(response.data[1]).toEqual({
+          id: expectedArticles[1].id,
+          title: expectedArticles[1].title,
+          slug: expectedArticles[1].slug,
+          status: expectedArticles[1].status,
+          createdAt: expectedArticles[1].createdAt,
+          updatedAt: expectedArticles[1].updatedAt,
+          headline: expectedArticles[1].headline,
+        });
+      });
     });
 
     it('derives excerpt for article body', async () => {
@@ -511,17 +871,23 @@ describe('ArticleService', () => {
         slug: 'title-1',
         body: 'body',
         createdAt,
+        status: ArticleStatus.DRAFT,
       });
       prisma.article.update.mockResolvedValue(expectedReturnValue);
 
-      const returnValue = await service.update('2', { title: 'title-2' });
+      const returnValue = await service.update('2', {
+        title: 'title-2',
+        status: ArticleStatus.PUBLISHED,
+      });
 
       expect(prisma.article.update).toHaveBeenCalledWith({
         where: { id: '2' },
         data: {
           title: 'title-2',
           slug: 'title-2',
+          status: ArticleStatus.PUBLISHED,
           updatedAt: expect.any(Date) as Date,
+          publishedAt: expect.any(Date) as Date,
         },
       });
       expect(returnValue).toBe(expectedReturnValue);

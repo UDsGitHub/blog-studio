@@ -17,7 +17,7 @@ describe('AppController (e2e)', () => {
   let asAdmin: (method: AllMethods, path: string) => STest;
   let asPublic: (method: AllMethods, path: string) => STest;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -37,8 +37,10 @@ describe('AppController (e2e)', () => {
 
   afterEach(async () => {
     await prisma.article.deleteMany();
+  });
+
+  afterAll(async () => {
     await app.close();
-    await prisma.$disconnect();
   });
 
   describe('default flow', () => {

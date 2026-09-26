@@ -6,34 +6,12 @@ import { RedisService } from '../../redis.service';
 export class ArticleCacheService {
   private readonly versionKey = 'articles:version';
   private TTL = 60;
-  private readonly OP_TIMEOUT_MS = 800;
 
   constructor(private readonly redis: RedisService) {}
 
-  private withTimeout<T>(promise: Promise<T>, ms = this.OP_TIMEOUT_MS) {
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error(`redis op timed out after ${ms}ms`)),
-        ms,
-      );
-      promise.then(
-        (value) => {
-          clearTimeout(timer);
-          resolve(value);
-        },
-        (error) => {
-          clearTimeout(timer);
-          reject(error as Error);
-        },
-      );
-    });
-  }
-
   private async getVersion() {
     try {
-      return Number(
-        (await this.withTimeout(this.redis.get(this.versionKey))) ?? 0,
-      );
+      return Number((await this.redis.get(this.versionKey)) ?? 0);
     } catch (error) {
       Logger.error(error);
     }
@@ -43,7 +21,7 @@ export class ArticleCacheService {
 
   async bumpVersion() {
     try {
-      await this.withTimeout(this.redis.incr(this.versionKey));
+      await this.redis.incr(this.versionKey);
     } catch (error) {
       Logger.error(error);
     }
@@ -56,9 +34,7 @@ export class ArticleCacheService {
 
   async get<T>(key: string): Promise<T | null> {
     try {
-      return JSON.parse(
-        (await this.withTimeout(this.redis.get(key))) ?? 'null',
-      ) as T | null;
+      return JSON.parse((await this.redis.get(key)) ?? 'null') as T | null;
     } catch (error) {
       Logger.error(error);
     }
@@ -72,9 +48,7 @@ export class ArticleCacheService {
    */
   async set<T>(key: string, value: T, ttl?: number) {
     try {
-      await this.withTimeout(
-        this.redis.set(key, JSON.stringify(value), 'EX', ttl ?? this.TTL),
-      );
+      await this.redis.set(key, JSON.stringify(value), 'EX', ttl ?? this.TTL);
     } catch (error) {
       Logger.error(error);
     }

@@ -10,7 +10,9 @@ export class RedisService extends Redis implements OnModuleDestroy {
     super(configService.get<string>('REDIS_URL') ?? 'redis://localhost:6379', {
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
-      commandTimeout: 1500,
+      connectTimeout: 1_000,
+      commandTimeout: 1_500,
+      retryStrategy: (times: number) => Math.min(times * 200, 2_000),
     });
 
     this.on('error', (error: Error) => {

@@ -11,7 +11,7 @@ import { SearchArticlesResponseDto } from '../src/article/dto/search-articles.dt
 const apiKey = process.env.API_KEY ?? 'blog_sk_test_e2e_key_not_for_prod';
 const authHeader = { Authorization: `ApiKey ${apiKey}` };
 
-describe('AppController (e2e)', () => {
+describe('App (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   let asAdmin: (method: AllMethods, path: string) => STest;

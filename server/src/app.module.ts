@@ -12,7 +12,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      // envFilePath: ['.env.test', '.env'],
+      envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],

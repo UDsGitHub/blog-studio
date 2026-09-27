@@ -3,6 +3,8 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
+import { MAX_REQUEST_BODY_BYTES } from './article/article.constants';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -15,6 +17,8 @@ async function bootstrap() {
       .map((origin) => origin.trim()),
   });
   app.set('trust proxy', process.env.TRUST_PROXY ?? 'loopback');
+  app.use(helmet());
+  app.useBodyParser('json', { limit: MAX_REQUEST_BODY_BYTES });
 
   const config = new DocumentBuilder()
     .setTitle('Article API')

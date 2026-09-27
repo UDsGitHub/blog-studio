@@ -8,8 +8,8 @@
 - [x] Redis hardening: enableOfflineQueue false / maxRetriesPerRequest / connectTimeout / commandTimeout / retryStrategy so commands fail fast instead of hanging — verified live, outage now resolves in 44-68ms instead of ~73.5s (see PLAN.md §11a)
 - [x] rate limiting: @nestjs/throttler, two-tier (short/long) via @SkipThrottle — verified live, 429 + Retry-After-{name} at the configured limit (see PLAN.md §12)
 - [x] set app.set('trust proxy', ...) in main.ts — done via TRUST_PROXY env var (loopback for local/CI, 1 for real dev); confirm the correct value is set as a real Railway env var before relying on rate limiting in production
-- [ ] add helmet to main.ts (see PLAN.md §12, API8)
-- [ ] add a request body size limit (see PLAN.md §12, API4)
+- [x] add helmet to main.ts — verified live: nosniff/frame-options/HSTS/CSP headers present, X-Powered-By gone; checked Swagger UI specifically against Helmet's CSP (a known historical conflict) and confirmed no issue, this version externalizes all script logic to same-origin files (see PLAN.md §12, API8)
+- [x] add a request body size limit — `useBodyParser('json', { limit: MAX_REQUEST_BODY_BYTES })` in main.ts, shared constants in `article.constants.ts` (MAX_TITLE_LENGTH/MAX_BODY_LENGTH/MAX_EXCERPT_LENGTH/MAX_REQUEST_BODY_BYTES) so the DTO char limits and the wire byte limit can't drift apart; verified live, 2MB payload → 413, 99k-char legitimate payload → 201 (see PLAN.md §12, API4)
 - [ ] test Postgres-outage graceful degradation the same way the Redis outage was tested (see PLAN.md §12, ops)
 - [x] write dedicated e2e tests for rate limiting — `test/throttle.e2e-spec.ts`; found and fixed 3 real bugs during review (missing async/await meant nothing was actually being tested; malformed UUIDs from a stray `}` in 3 URLs; the search test was hitting the browse route, not /articles/search, and silently sharing its throttle bucket) — all 7 cases now genuinely pass
 

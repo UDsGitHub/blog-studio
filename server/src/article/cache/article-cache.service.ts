@@ -5,7 +5,8 @@ import { RedisService } from '../../redis.service';
 @Injectable()
 export class ArticleCacheService {
   private readonly versionKey = 'articles:version';
-  private TTL = 60;
+  private readonly TTL = 60;
+  private readonly logger = new Logger(ArticleCacheService.name);
 
   constructor(private readonly redis: RedisService) {}
 
@@ -13,7 +14,7 @@ export class ArticleCacheService {
     try {
       return Number((await this.redis.get(this.versionKey)) ?? 0);
     } catch (error) {
-      Logger.error(error);
+      this.logger.error(error);
     }
 
     return 0;
@@ -23,7 +24,7 @@ export class ArticleCacheService {
     try {
       await this.redis.incr(this.versionKey);
     } catch (error) {
-      Logger.error(error);
+      this.logger.error(error);
     }
   }
 
@@ -36,7 +37,7 @@ export class ArticleCacheService {
     try {
       return JSON.parse((await this.redis.get(key)) ?? 'null') as T | null;
     } catch (error) {
-      Logger.error(error);
+      this.logger.error(error);
     }
     return null;
   }
@@ -50,7 +51,7 @@ export class ArticleCacheService {
     try {
       await this.redis.set(key, JSON.stringify(value), 'EX', ttl ?? this.TTL);
     } catch (error) {
-      Logger.error(error);
+      this.logger.error(error);
     }
   }
 

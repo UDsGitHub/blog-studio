@@ -7,6 +7,7 @@ import { ArticleService } from './article.service';
 import { PrismaService } from '../prisma.service';
 import { ArticleStatus } from '../generated/prisma/client';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { WebhookService } from '../webhook/webhook.service';
 
 describe('ArticleService', () => {
   let service: ArticleService;
@@ -25,6 +26,9 @@ describe('ArticleService', () => {
     },
     $queryRaw: jest.fn(),
   };
+  const webhookService = {
+    notify: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -35,6 +39,10 @@ describe('ArticleService', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: WebhookService,
+          useValue: webhookService,
         },
       ],
     }).compile();
@@ -77,6 +85,7 @@ describe('ArticleService', () => {
         },
       });
       expect(returnValue).toBe(expectedReturnValue);
+      expect(webhookService.notify).not.toHaveBeenCalled();
     });
 
     it('creates an article with unique slug if title slug collides', async () => {
@@ -125,6 +134,7 @@ describe('ArticleService', () => {
 
       prisma.article.count.mockResolvedValue(0);
       prisma.article.create.mockResolvedValue(expectedReturnValue);
+      webhookService.notify.mockResolvedValue(Promise.resolve());
 
       const returnValue = await service.create({
         title,
@@ -142,28 +152,59 @@ describe('ArticleService', () => {
         },
       });
       expect(returnValue).toBe(expectedReturnValue);
+      expect(webhookService.notify).toHaveBeenCalledWith({
+        event: 'published',
+        id: returnValue.id,
+        slug: returnValue.slug,
+        timestamp: expect.any(String) as string,
+      });
     });
 
     it('creates new slug history entry if article is published and title is changed', async () => {
       const articleId = '1';
-      const articleSlug = 'slug';
 
       prisma.article.findUnique.mockResolvedValue({
         id: articleId,
         title: 'title',
-        slug: articleSlug,
+        slug: 'title',
         body: 'hello',
         status: ArticleStatus.PUBLISHED,
         publishedAt: new Date('2026-09-01'),
       });
+      prisma.article.update.mockResolvedValue({
+        id: articleId,
+        title: 'new title',
+        slug: 'new-title',
+        body: 'hello',
+        status: ArticleStatus.PUBLISHED,
+        publishedAt: new Date('2026-09-01'),
+        updatedAt: expect.any(Date) as Date,
+      });
+      prisma.article.count.mockResolvedValueOnce(0);
+      webhookService.notify.mockResolvedValue(Promise.resolve());
 
       await service.update(articleId, { title: 'new title' });
 
+      expect(prisma.article.update).toHaveBeenCalledWith({
+        data: {
+          title: 'new title',
+          slug: 'new-title',
+          updatedAt: expect.any(Date) as Date,
+        },
+        where: { id: articleId },
+      });
       expect(prisma.articleSlugHistory.create).toHaveBeenCalledWith({
         data: {
           articleId,
-          slug: articleSlug,
+          slug: 'title',
         },
+      });
+      expect(webhookService.notify).toHaveBeenCalledWith({
+        event: 'updated',
+        id: articleId,
+        slug: 'new-title',
+        previousSlug: 'title',
+        timestamp: expect.any(String) as string,
       });
     });
 
@@ -860,6 +901,7 @@ describe('ArticleService', () => {
         title: 'title-2',
         slug: 'title-2',
         body: 'body',
+        status: ArticleStatus.PUBLISHED,
         createdAt,
         updatedAt,
       };
@@ -874,6 +916,7 @@ describe('ArticleService', () => {
         status: ArticleStatus.DRAFT,
       });
       prisma.article.update.mockResolvedValue(expectedReturnValue);
+      webhookService.notify.mockResolvedValue(Promise.resolve());
 
       const returnValue = await service.update('2', {
         title: 'title-2',
@@ -892,6 +935,12 @@ describe('ArticleService', () => {
       });
       expect(returnValue).toBe(expectedReturnValue);
       expect(returnValue.slug).toBe('title-2');
+      expect(webhookService.notify).toHaveBeenCalledWith({
+        event: 'published',
+        id: expectedReturnValue.id,
+        slug: expectedReturnValue.slug,
+        timestamp: expect.any(String) as string,
+      });
     });
 
     it('updates article body only', async () => {
@@ -913,6 +962,7 @@ describe('ArticleService', () => {
         slug: 'title',
         body: 'body',
         createdAt,
+        status: ArticleStatus.DRAFT,
       });
       prisma.article.update.mockResolvedValue(expectedReturnValue);
 
@@ -924,15 +974,17 @@ describe('ArticleService', () => {
       });
       expect(returnValue).toBe(expectedReturnValue);
       expect(returnValue.slug).toBe('title');
+      expect(webhookService.notify).not.toHaveBeenCalled();
     });
 
-    it('deletes article by id', async () => {
+    it('deletes article by id - DRAFT | ARCHIVED', async () => {
       const expectedReturnValue = {
         id: '2',
         title: 'title-2',
         slug: 'title-2',
         body: 'body',
         createdAt: new Date(),
+        status: ArticleStatus.DRAFT,
       };
 
       prisma.article.findUnique.mockResolvedValue(expectedReturnValue);
@@ -944,6 +996,34 @@ describe('ArticleService', () => {
         where: { id: '2' },
       });
       expect(returnValue).toBe(expectedReturnValue);
+    });
+
+    it('deletes article by id - PUBLISHED', async () => {
+      const expectedReturnValue = {
+        id: '2',
+        title: 'title-2',
+        slug: 'title-2',
+        body: 'body',
+        createdAt: new Date(),
+        status: ArticleStatus.PUBLISHED,
+      };
+
+      prisma.article.findUnique.mockResolvedValue(expectedReturnValue);
+      prisma.article.delete.mockResolvedValue(expectedReturnValue);
+      webhookService.notify.mockResolvedValue(Promise.resolve());
+
+      const returnValue = await service.remove('2');
+
+      expect(prisma.article.delete).toHaveBeenCalledWith({
+        where: { id: '2' },
+      });
+      expect(returnValue).toBe(expectedReturnValue);
+      expect(webhookService.notify).toHaveBeenCalledWith({
+        event: 'deleted',
+        id: returnValue.id,
+        slug: returnValue.slug,
+        timestamp: expect.any(String) as string,
+      });
     });
   });
 
@@ -976,6 +1056,15 @@ describe('ArticleService', () => {
         status: ArticleStatus.PUBLISHED,
         publishedAt,
       });
+      prisma.article.update.mockResolvedValue({
+        id: '1',
+        title: 'title',
+        slug: 'slug',
+        body: 'body',
+        status: ArticleStatus.DRAFT,
+        publishedAt,
+      });
+      webhookService.notify.mockResolvedValue(Promise.resolve());
 
       await service.update('1', { status: ArticleStatus.DRAFT });
 
@@ -985,6 +1074,79 @@ describe('ArticleService', () => {
           status: ArticleStatus.DRAFT,
           updatedAt: expect.any(Date) as Date,
         },
+      });
+      expect(webhookService.notify).toHaveBeenCalledWith({
+        event: 'unpublished',
+        id: '1',
+        slug: 'slug',
+        timestamp: expect.any(String) as string,
+      });
+    });
+
+    it('notifies unpublished when archiving a PUBLISHED article', async () => {
+      const publishedAt = new Date('2026-09-01');
+      prisma.article.findUnique.mockResolvedValue({
+        id: '1',
+        title: 'title',
+        slug: 'slug',
+        body: 'body',
+        status: ArticleStatus.PUBLISHED,
+        publishedAt,
+      });
+      prisma.article.update.mockResolvedValue({
+        id: '1',
+        title: 'title',
+        slug: 'slug',
+        body: 'body',
+        status: ArticleStatus.ARCHIVED,
+        publishedAt,
+      });
+      webhookService.notify.mockResolvedValue(Promise.resolve());
+
+      await service.update('1', { status: ArticleStatus.ARCHIVED });
+
+      expect(webhookService.notify).toHaveBeenCalledWith({
+        event: 'unpublished',
+        id: '1',
+        slug: 'slug',
+        timestamp: expect.any(String) as string,
+      });
+    });
+
+    it('notifies published when republishing an ARCHIVED article', async () => {
+      const publishedAt = new Date('2026-09-01');
+      prisma.article.findUnique.mockResolvedValue({
+        id: '1',
+        title: 'title',
+        slug: 'slug',
+        body: 'body',
+        status: ArticleStatus.ARCHIVED,
+        publishedAt,
+      });
+      prisma.article.update.mockResolvedValue({
+        id: '1',
+        title: 'title',
+        slug: 'slug',
+        body: 'body',
+        status: ArticleStatus.PUBLISHED,
+        publishedAt,
+      });
+      webhookService.notify.mockResolvedValue(Promise.resolve());
+
+      await service.update('1', { status: ArticleStatus.PUBLISHED });
+
+      expect(prisma.article.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: {
+          status: ArticleStatus.PUBLISHED,
+          updatedAt: expect.any(Date) as Date,
+        },
+      });
+      expect(webhookService.notify).toHaveBeenCalledWith({
+        event: 'published',
+        id: '1',
+        slug: 'slug',
+        timestamp: expect.any(String) as string,
       });
     });
 

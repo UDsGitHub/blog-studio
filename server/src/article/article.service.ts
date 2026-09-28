@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreateArticleDto } from './dto/create-article.dto';
@@ -13,10 +14,17 @@ import { Prisma } from '../generated/prisma/client';
 import { ArticlePreview, ArticleSearchPreview } from './article.types';
 import removeMd from 'remove-markdown';
 import { SearchArticlesResponseDto } from './dto/search-articles.dto';
+import { WebhookService } from '../webhook/webhook.service';
+import { WebhookEvent } from '../webhook/webhook.types';
 
 @Injectable()
 export class ArticleService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ArticleService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly webhookService: WebhookService,
+  ) {}
 
   async create(createArticleDto: CreateArticleDto) {
     const { title, body, excerpt, status } = createArticleDto;
@@ -27,9 +35,24 @@ export class ArticleService {
       createData['publishedAt'] = new Date();
     }
 
-    return this.prisma.article.create({
+    const createdArticle = await this.prisma.article.create({
       data: createData,
     });
+
+    if (createdArticle.status === ArticleStatus.PUBLISHED) {
+      void this.webhookService
+        .notify({
+          event: 'published',
+          id: createdArticle.id,
+          slug: createdArticle.slug,
+          timestamp: new Date().toISOString(),
+        })
+        .catch((error) =>
+          this.logWebhookException(error, 'published', createdArticle.id),
+        );
+    }
+
+    return createdArticle;
   }
 
   async browse(
@@ -108,16 +131,18 @@ export class ArticleService {
     const updateData = { ...updateArticleDto };
 
     const article = await this.findById(id);
-    const draftToPublished =
-      updateData?.status === ArticleStatus.PUBLISHED &&
-      article.status === ArticleStatus.DRAFT;
-    if (draftToPublished && !article.publishedAt) {
-      updateData['publishedAt'] = new Date();
-    }
 
     const draftToArchived =
       updateData?.status === ArticleStatus.ARCHIVED &&
       article.status === ArticleStatus.DRAFT;
+
+    if (
+      updateData?.status === ArticleStatus.PUBLISHED &&
+      !article.publishedAt
+    ) {
+      updateData['publishedAt'] = new Date();
+    }
+
     if (draftToArchived) {
       throw new BadRequestException(
         'Cannot archive an article that has never been published',
@@ -135,16 +160,74 @@ export class ArticleService {
       }
     }
 
-    return this.prisma.article.update({
+    const updatedArticle = await this.prisma.article.update({
       data: updateData,
       where: { id },
     });
+
+    const wasPublished = article.status === ArticleStatus.PUBLISHED;
+    const isPublished = updatedArticle.status === ArticleStatus.PUBLISHED;
+    const previousSlug =
+      article.slug !== updatedArticle.slug ? article.slug : undefined;
+
+    if (!wasPublished && isPublished) {
+      void this.webhookService
+        .notify({
+          event: 'published',
+          id: updatedArticle.id,
+          slug: updatedArticle.slug,
+          timestamp: new Date().toISOString(),
+        })
+        .catch((error) =>
+          this.logWebhookException(error, 'published', updatedArticle.id),
+        );
+    } else if (wasPublished && !isPublished) {
+      void this.webhookService
+        .notify({
+          event: 'unpublished',
+          id: updatedArticle.id,
+          slug: updatedArticle.slug,
+          timestamp: new Date().toISOString(),
+        })
+        .catch((error) =>
+          this.logWebhookException(error, 'unpublished', updatedArticle.id),
+        );
+    } else if (isPublished) {
+      void this.webhookService
+        .notify({
+          event: 'updated',
+          id: updatedArticle.id,
+          slug: updatedArticle.slug,
+          previousSlug,
+          timestamp: new Date().toISOString(),
+        })
+        .catch((error) =>
+          this.logWebhookException(error, 'updated', updatedArticle.id),
+        );
+    }
+
+    return updatedArticle;
   }
 
   async remove(id: string) {
-    await this.findById(id);
+    const article = await this.findById(id);
 
-    return this.prisma.article.delete({ where: { id } });
+    const deletedArticle = await this.prisma.article.delete({ where: { id } });
+
+    if (article.status === ArticleStatus.PUBLISHED) {
+      void this.webhookService
+        .notify({
+          event: 'deleted',
+          id: article.id,
+          slug: article.slug,
+          timestamp: new Date().toISOString(),
+        })
+        .catch((error) =>
+          this.logWebhookException(error, 'deleted', article.id),
+        );
+    }
+
+    return deletedArticle;
   }
 
   private async getSlug(
@@ -301,5 +384,16 @@ export class ArticleService {
     const lastSpace = sliced.lastIndexOf(' ');
     const trimSliced = lastSpace > 0 ? sliced.slice(0, lastSpace) : sliced;
     return `${trimSliced.trimEnd()}...`;
+  }
+
+  private logWebhookException(
+    error: any,
+    event: WebhookEvent,
+    articleId: string,
+  ) {
+    this.logger.warn(
+      `Unexpected error notifying webhook clients (${event}, ${articleId})`,
+      error,
+    );
   }
 }

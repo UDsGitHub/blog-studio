@@ -30,7 +30,7 @@ Plan: see PLAN.md. API first, then UI.
 - [x] date range filter (from/to on publishedAt)
 - [x] allow unpublish (PUBLISHED -> DRAFT) directly; keep DRAFT -> ARCHIVED blocked (500); publishedAt untouched by unpublish
 - [x] fix slug history to key off `publishedAt` ever set, not current status === PUBLISHED (was dropping history for renames made while unpublished/archived)
-- [ ] webhook module: signed payload, WEBHOOK_URLS env, publish-affecting events only
+- [x] webhook module: `WebhookService` (`server/src/webhook/`), HMAC-SHA256 signed payload via `@nestjs/http-client`, `WEBHOOK_URLS`/`WEBHOOK_SECRET` env, publish-affecting events only (published/unpublished/updated/deleted, decided from before/after state in `ArticleService`) — see PLAN.md §13
 - [x] ETag + Cache-Control on list and detail
 - [x] update tests for all of the above
 - [x] follow-up: draftToArchived now throws BadRequestException (400) instead of 500

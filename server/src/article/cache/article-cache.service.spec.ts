@@ -1,6 +1,7 @@
 import { ArticleCacheService } from './article-cache.service';
 import { ArticleStatus } from '../../generated/prisma/enums';
 import { RedisService } from '../../redis.service';
+import { Test, TestingModule } from '@nestjs/testing';
 
 describe('Article Cache Service', () => {
   const versionKey = 'articles:version';
@@ -11,11 +12,22 @@ describe('Article Cache Service', () => {
     set: jest.fn(),
     incr: jest.fn(),
   };
+  let errorSpy: jest.SpyInstance;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.resetAllMocks();
 
-    service = new ArticleCacheService(redis as unknown as RedisService);
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ArticleCacheService,
+        { provide: RedisService, useValue: redis },
+      ],
+    }).compile();
+
+    service = module.get<ArticleCacheService>(ArticleCacheService);
+    errorSpy = jest
+      .spyOn(service['logger'], 'error')
+      .mockImplementation(() => undefined);
   });
 
   it('bumpVersion calls increments version number', async () => {
@@ -34,6 +46,7 @@ describe('Article Cache Service', () => {
   it('bumpVersion swallows redis errors', async () => {
     redis.incr.mockRejectedValue(new Error('redis down'));
     await expect(service.bumpVersion()).resolves.toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledWith(new Error('redis down'));
   });
 
   it('get calls redis.get()', async () => {
@@ -62,6 +75,7 @@ describe('Article Cache Service', () => {
   it('get returns null when redis throws', async () => {
     redis.get.mockRejectedValue(new Error('redis down'));
     await expect(service.get('key')).resolves.toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(new Error('redis down'));
   });
 
   it('get returns null when cached value is invalid JSON', async () => {
@@ -94,6 +108,7 @@ describe('Article Cache Service', () => {
     await expect(
       service.set('key', { title: 'title' }),
     ).resolves.toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledWith(new Error('redis down'));
   });
 
   it('browseKey()', async () => {
@@ -117,6 +132,7 @@ describe('Article Cache Service', () => {
     expect(response).toBe(
       'articles:v0:browse:25:undefined:PUBLISHED:undefined:undefined',
     );
+    expect(errorSpy).toHaveBeenCalledWith(new Error('redis down'));
   });
 
   it('searchKey()', async () => {

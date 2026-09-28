@@ -28,6 +28,6 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/dist ./dist
 COPY prisma ./prisma
 COPY prisma7.config.ts ./
-RUN useradd --create-home appuser
+RUN useradd --create-home appuser && chown -R appuser:appuser /app
 USER appuser
 CMD ["node", "dist/main.js"]

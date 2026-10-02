@@ -1,13 +1,9 @@
-import type { ArticleStatus } from "@/types";
-
-export type ArticleFilter = {
-  status?: ArticleStatus;
+export type ArticleFilters = {
   startDate?: string;
   endDate?: string;
 };
 
-export const defaultArticleFilter: ArticleFilter = {
-  status: undefined,
+export const defaultArticleFilters: ArticleFilters = {
   startDate: undefined,
   endDate: undefined,
 };

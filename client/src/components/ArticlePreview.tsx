@@ -16,6 +16,7 @@ type Props = {
 };
 
 const getArticlePrimaryDate = (
+  status: ArticleStatus,
   createdAt: string,
   updatedAt: string | null,
   publishedAt: string | null,
@@ -70,7 +71,7 @@ export default function ArticlePreview({
         <span>&bull;</span>
         <span className="text-xs">
           {formatDistanceToNow(
-            getArticlePrimaryDate(createdAt, updatedAt, publishedAt),
+            getArticlePrimaryDate(status, createdAt, updatedAt, publishedAt),
           )}
         </span>
       </div>

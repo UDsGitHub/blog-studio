@@ -1,11 +1,10 @@
-export const ArticleStatusLabel = {
-  DRAFT: "DRAFT",
-  PUBLISHED: "PUBLISHED",
-  ARCHIVED: "ARCHIVED",
-} as const;
+export type ArticleStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
-export type ArticleStatus =
-  (typeof ArticleStatusLabel)[keyof typeof ArticleStatusLabel];
+export const ArticleStatusLabel: { [k in ArticleStatus]: string } = {
+  DRAFT: "Draft",
+  PUBLISHED: "Published",
+  ARCHIVED: "Archived",
+} as const;
 
 export type Article = {
   id: string;

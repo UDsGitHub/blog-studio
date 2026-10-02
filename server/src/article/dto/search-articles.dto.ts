@@ -25,7 +25,7 @@ export class SearchArticlesQueryDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  limit: number = 25;
+  limit: number = 4;
 
   @IsOptional()
   @IsEnum(ArticleStatus)

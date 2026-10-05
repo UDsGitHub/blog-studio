@@ -14,7 +14,7 @@ import { Link } from "react-router";
 import ArticlesListLoader from "./ArticlesListLoader";
 import ArticlesEmptyList from "./ArticlesEmptyList";
 import { ArticlePreview, InfiniteScroll } from "@/components";
-import ArticleFilters from "./ArticleFilters";
+import ArticleFilters from "./filters/ArticleFilters";
 import { useArticlesState } from "./useArticlesState";
 
 // TODO revisit virtualization - writing infinite loading from scratch would allow you to pass a ref for virtualization as well.
@@ -32,6 +32,7 @@ export default function AppSidebar() {
     handleStatusFilterChange,
     filters,
     handleFilterChange,
+    getVirtualItems,
   } = useArticlesState();
 
   const renderArticles = () => {
@@ -55,16 +56,18 @@ export default function AppSidebar() {
         loader={<ArticlesListLoader />}
         className="px-0.5"
       >
-        <SidebarMenu>
+        <SidebarMenu className="scroll-fade">
           <SidebarMenuItem className="mb-4">
             <ArticleFilters
+              key={JSON.stringify(filters)}
               statusFilter={statusFilter}
               onStatusFilterChange={handleStatusFilterChange}
               filters={filters}
               onFiltersChange={handleFilterChange}
             />
           </SidebarMenuItem>
-          {articles.map((preview) => {
+          {getVirtualItems().map((item) => {
+            const preview = articles[item.index];
             return (
               <SidebarMenuItem key={preview.id}>
                 <SidebarMenuButton

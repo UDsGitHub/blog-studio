@@ -1,8 +1,9 @@
 import { useLazyBrowseArticlesQuery } from "@/api/articlesApi";
 import type { BrowseArticlesRequest } from "@/api/types";
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
-import { defaultArticleFilters, type ArticleFilters } from "./filter";
+import { defaultArticleFilters, type ArticleFilters } from "./filters/filter";
 import { type ArticlePreview, type ArticleStatus } from "@/types";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 export const useArticlesState = () => {
   const [statusFilter, setStatusFilter] = useState<ArticleStatus | undefined>(
@@ -27,6 +28,12 @@ export const useArticlesState = () => {
     [statusFilter, filters],
   );
   const infiniteScrollRef = useRef<HTMLUListElement | null>(null);
+  const { getVirtualItems } = useVirtualizer({
+    count: articles.length,
+    getScrollElement: () => infiniteScrollRef.current,
+    estimateSize: () => 100,
+    directDomUpdates: true,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +83,7 @@ export const useArticlesState = () => {
     statusFilter,
     handleStatusFilterChange,
     filters,
-    handleFilterChange
+    handleFilterChange,
+    getVirtualItems,
   };
 };

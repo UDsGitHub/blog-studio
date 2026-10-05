@@ -37,7 +37,8 @@ export function ThemeProvider({
   }, [theme])
 
   const value = {
-    theme,
+    // TODO do not commit this change
+    theme: 'system' as const,
     setTheme: (theme: Theme) => {
       localStorage.setItem(storageKey, theme)
       setTheme(theme)

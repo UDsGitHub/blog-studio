@@ -18,12 +18,10 @@ export class ArticleQueryGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const response = context.switchToHttp().getResponse<Response>();
 
-    const { status, startDate, endDate } = request.query;
+    const { status } = request.query;
 
-    if (!request.isAuthenticated && !status) {
-      throw new BadRequestException(
-        'status is a required field for unauthenticated users',
-      );
+    if (!status) {
+      throw new BadRequestException('status is a required field');
     }
 
     if (
@@ -31,12 +29,6 @@ export class ArticleQueryGuard implements CanActivate {
       (status === ArticleStatus.DRAFT || status === ArticleStatus.ARCHIVED)
     ) {
       throw new UnauthorizedException();
-    }
-
-    if ((startDate || endDate) && !status) {
-      throw new BadRequestException(
-        'status is required when filtering by startDate or endDate',
-      );
     }
 
     response.set(

@@ -28,12 +28,14 @@ export default function AppSidebar() {
     error,
     infiniteScrollRef,
     fetchMore,
+    filters: articleFilters,
+  } = useArticlesState();
+  const {
     statusFilter,
     handleStatusFilterChange,
     filters,
     handleFilterChange,
-    getVirtualItems,
-  } = useArticlesState();
+  } = articleFilters;
 
   const renderArticles = () => {
     if (isLoading) {
@@ -66,8 +68,7 @@ export default function AppSidebar() {
               onFiltersChange={handleFilterChange}
             />
           </SidebarMenuItem>
-          {getVirtualItems().map((item) => {
-            const preview = articles[item.index];
+          {articles.map((preview) => {
             return (
               <SidebarMenuItem key={preview.id}>
                 <SidebarMenuButton

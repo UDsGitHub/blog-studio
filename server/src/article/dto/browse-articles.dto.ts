@@ -27,9 +27,8 @@ export class BrowseArticlesQueryDto {
   @Max(100)
   limit: number = 25;
 
-  @IsOptional()
   @IsEnum(ArticleStatus)
-  status?: ArticleStatus;
+  status!: ArticleStatus;
 
   @IsOptional()
   @Type(() => Date)

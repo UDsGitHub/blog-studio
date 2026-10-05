@@ -1,15 +1,10 @@
 import { useLazyBrowseArticlesQuery } from "@/api/articlesApi";
 import type { BrowseArticlesRequest } from "@/api/types";
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
-import { defaultArticleFilters, type ArticleFilters } from "./filters/filter";
-import { type ArticlePreview, type ArticleStatus } from "@/types";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { type ArticlePreview } from "@/types";
+import { useArticleFilters } from "./useArticleFilters";
 
 export const useArticlesState = () => {
-  const [statusFilter, setStatusFilter] = useState<ArticleStatus | undefined>(
-    undefined,
-  );
-  const [filters, setFilters] = useState<ArticleFilters>(defaultArticleFilters);
   const [fetchArticles, { data: articleData, isLoading, isFetching, error }] =
     useLazyBrowseArticlesQuery();
   const [articles, setArticles] = useState<ArticlePreview[]>(
@@ -18,6 +13,12 @@ export const useArticlesState = () => {
   const [hasMore, setHasMore] = useState<boolean>(
     articleData?.hasMore ?? false,
   );
+  const {
+    statusFilter,
+    handleStatusFilterChange,
+    filters,
+    handleFilterChange,
+  } = useArticleFilters();
   const fetchRequest: BrowseArticlesRequest = useMemo(
     () => ({
       limit: 4,
@@ -28,12 +29,6 @@ export const useArticlesState = () => {
     [statusFilter, filters],
   );
   const infiniteScrollRef = useRef<HTMLUListElement | null>(null);
-  const { getVirtualItems } = useVirtualizer({
-    count: articles.length,
-    getScrollElement: () => infiniteScrollRef.current,
-    estimateSize: () => 100,
-    directDomUpdates: true,
-  });
 
   useEffect(() => {
     let cancelled = false;
@@ -67,11 +62,6 @@ export const useArticlesState = () => {
     setHasMore(data.hasMore);
   }, [fetchArticles, fetchRequest, articles, hasMore]);
 
-  const handleStatusFilterChange = (value?: ArticleStatus) =>
-    setStatusFilter(value);
-  const handleFilterChange = (value: Partial<ArticleFilters>) =>
-    setFilters((prev) => ({ ...prev, ...value }));
-
   return {
     articles,
     hasMore,
@@ -80,10 +70,11 @@ export const useArticlesState = () => {
     error,
     infiniteScrollRef,
     fetchMore,
-    statusFilter,
-    handleStatusFilterChange,
-    filters,
-    handleFilterChange,
-    getVirtualItems,
+    filters: {
+      statusFilter,
+      handleStatusFilterChange,
+      filters,
+      handleFilterChange,
+    },
   };
 };

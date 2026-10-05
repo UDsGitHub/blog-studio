@@ -414,11 +414,16 @@ describe('App (e2e)', () => {
 
   describe('fails as needed', () => {
     it('browse articles throws 400 on bad request', async () => {
-      await asAdmin('get', '/articles?cursorId=1&limit=10').expect(400);
-      await asAdmin('get', '/articles?cursorId=1&limit=string').expect(400);
+      await asAdmin('get', '/articles?cursorId=1&limit=10&status=DRAFT').expect(
+        400,
+      );
       await asAdmin(
         'get',
-        `/articles?cursorId=${crypto.randomUUID()}&limit=string`,
+        '/articles?cursorId=1&limit=string&status=DRAFT',
+      ).expect(400);
+      await asAdmin(
+        'get',
+        `/articles?cursorId=${crypto.randomUUID()}&limit=string&status=DRAFT`,
       ).expect(400);
       await asAdmin(
         'get',
@@ -692,6 +697,8 @@ describe('App (e2e)', () => {
     it('missing status throws 400 on browse/search articles', async () => {
       await asPublic('get', '/articles').expect(400);
       await asPublic('get', '/articles/search').expect(400);
+      await asAdmin('get', '/articles').expect(400);
+      await asAdmin('get', '/articles/search?search=banana').expect(400);
     });
 
     it('PUBLISHED status returns 200 on browse/search articles', async () => {

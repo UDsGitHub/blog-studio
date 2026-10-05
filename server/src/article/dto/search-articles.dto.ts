@@ -27,9 +27,8 @@ export class SearchArticlesQueryDto {
   @Max(100)
   limit: number = 4;
 
-  @IsOptional()
   @IsEnum(ArticleStatus)
-  status?: ArticleStatus;
+  status!: ArticleStatus;
 
   @IsOptional()
   @Type(() => Date)

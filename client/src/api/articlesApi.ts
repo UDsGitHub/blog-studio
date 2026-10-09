@@ -51,7 +51,7 @@ export const articlesApi = createApi({
     >({
       query: (request) => {
         const params = getUrlQueryParamsFromObject(request);
-        return `articles?${params.toString()}`;
+        return `articles/search?${params.toString()}`;
       },
     }),
     findArticleById: builder.query<Article, FindArticleByIdRequest>({

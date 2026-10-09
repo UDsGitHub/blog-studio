@@ -1,5 +1,7 @@
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ArticleStatusLabel, type ArticleStatus } from "@/types";
+import { cn } from "cn";
 import { StickyNote, CircleDashedCheck, Archive } from "lucide-react";
 
 type Props = {
@@ -7,40 +9,61 @@ type Props = {
   onChange: (value: ArticleStatus | undefined) => void;
 };
 
-const toggleGroupItemClass =
-  "rounded-full data-pressed:bg-primary data-pressed:text-primary-foreground";
+const radioGroupItemClass = cn("aspect-auto size-auto");
+const radioGroupItemBtnClass = cn("py-1");
 
 export default function StatusFilters({ statusFilter, onChange }: Props) {
   return (
-    <ToggleGroup
-      variant="outline"
-      value={statusFilter ? [statusFilter] : undefined}
-      onValueChange={(value) => onChange(value[0] as ArticleStatus)}
+    <RadioGroup
+      value={statusFilter}
+      onValueChange={(value) => onChange(value as ArticleStatus)}
+      className={"flex items-center"}
     >
-      <ToggleGroupItem
+      <RadioGroupItem
         value={"DRAFT" as const}
         aria-label={ArticleStatusLabel["DRAFT"]}
-        className={toggleGroupItemClass}
-      >
-        <StickyNote />
-        <span>{ArticleStatusLabel["DRAFT"]}</span>
-      </ToggleGroupItem>
-      <ToggleGroupItem
+        className={radioGroupItemClass}
+        nativeButton
+        render={
+          <Button
+            variant={statusFilter === "DRAFT" ? "default" : "outline"}
+            className={radioGroupItemBtnClass}
+          >
+            <StickyNote />
+            {ArticleStatusLabel["DRAFT"]}
+          </Button>
+        }
+      ></RadioGroupItem>
+      <RadioGroupItem
         value={"PUBLISHED" as const}
         aria-label={ArticleStatusLabel["PUBLISHED"]}
-        className={toggleGroupItemClass}
-      >
-        <CircleDashedCheck />
-        <span>{ArticleStatusLabel["PUBLISHED"]}</span>
-      </ToggleGroupItem>
-      <ToggleGroupItem
+        className={radioGroupItemClass}
+        nativeButton
+        render={
+          <Button
+            variant={statusFilter === "PUBLISHED" ? "default" : "outline"}
+            className={radioGroupItemBtnClass}
+          >
+            <CircleDashedCheck />
+            {ArticleStatusLabel["PUBLISHED"]}
+          </Button>
+        }
+      ></RadioGroupItem>
+      <RadioGroupItem
         value={"ARCHIVED" as const}
         aria-label={ArticleStatusLabel["ARCHIVED"]}
-        className={toggleGroupItemClass}
-      >
-        <Archive />
-        <span>{ArticleStatusLabel["ARCHIVED"]}</span>
-      </ToggleGroupItem>
-    </ToggleGroup>
+        className={radioGroupItemClass}
+        nativeButton
+        render={
+          <Button
+            variant={statusFilter === "ARCHIVED" ? "default" : "outline"}
+            className={radioGroupItemBtnClass}
+          >
+            <Archive />
+            {ArticleStatusLabel["ARCHIVED"]}
+          </Button>
+        }
+      ></RadioGroupItem>
+    </RadioGroup>
   );
 }

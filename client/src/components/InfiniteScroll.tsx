@@ -1,7 +1,9 @@
 import React from "react";
 import { useEffect, useRef, type RefObject } from "react";
+import { Button } from "./ui/button";
+import type { ErrorMessage } from "@/types/error";
 
-type Props = React.HTMLAttributes<HTMLDivElement> & {
+type BaseProps = React.HTMLAttributes<HTMLDivElement> & {
   ref: RefObject<HTMLUListElement | null>;
   hasMore: boolean;
   fetchMore: () => Promise<void>;
@@ -11,19 +13,33 @@ type Props = React.HTMLAttributes<HTMLDivElement> & {
   children: React.ReactElement<React.ComponentProps<"ul">, "ul">;
 };
 
+type ErrorProps =
+  | {
+      hasError: true;
+      errorMessage: ErrorMessage;
+    }
+  | {
+      hasError: false;
+      errorMessage: undefined;
+    };
+
+type WithErrorProps = BaseProps & ErrorProps;
+
 export default function InfiniteScroll({
   ref,
   hasMore,
   fetchMore,
+  hasError,
+  errorMessage,
   isLoading,
   loader,
   itemHeight = 100,
   children,
-}: Props) {
+}: WithErrorProps) {
   const observerRef = useRef<HTMLLIElement | null>(null);
 
   useEffect(() => {
-    if (isLoading || !hasMore) return;
+    if (isLoading || !hasMore || hasError) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -39,7 +55,7 @@ export default function InfiniteScroll({
     }
 
     return () => observer.disconnect();
-  }, [hasMore, fetchMore, isLoading]);
+  }, [hasMore, hasError, fetchMore, isLoading]);
 
   return React.cloneElement(children, {
     ref,
@@ -47,6 +63,23 @@ export default function InfiniteScroll({
       <>
         {children.props.children}
         {isLoading && loader}
+        {!isLoading && hasError && (
+          <div className="flex flex-col items-center bg-background rounded-lg p-4">
+            <p className="text-sm">{errorMessage.message}</p>
+            {errorMessage.subtext && (
+              <span className="text-muted-foreground text-sm">
+                {errorMessage.subtext}
+              </span>
+            )}
+            <Button
+              className={"mt-4"}
+              variant={"secondary"}
+              onClick={fetchMore}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
         <li
           ref={observerRef}
           style={{ height: itemHeight, background: "transparent" }}

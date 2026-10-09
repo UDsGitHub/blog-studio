@@ -31,7 +31,7 @@ export default function ArticleFilters({
       showSwipeHandle={isMobile}
       swipeDirection={isMobile ? "down" : "left"}
     >
-      <div className="flex items-center gap-2">
+      <div className="pt-1 pb-3 flex items-center gap-2">
         <StatusFilters
           statusFilter={statusFilter}
           onChange={onStatusFilterChange}

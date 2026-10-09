@@ -27,7 +27,9 @@ export class SearchArticlesQueryDto {
   @Max(100)
   limit: number = 4;
 
-  @IsEnum(ArticleStatus)
+  @IsEnum(ArticleStatus, {
+    message: 'Status must be one of either Draft, Published, or Archived',
+  })
   status!: ArticleStatus;
 
   @IsOptional()

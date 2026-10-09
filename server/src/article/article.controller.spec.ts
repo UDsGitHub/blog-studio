@@ -69,18 +69,21 @@ describe('ArticleController', () => {
 
     it('calls app.service.browse()', async () => {
       const expectedKey =
-        'articles:v1:browse:25:undefined:undefined:undefined:undefined';
+        'articles:v1:browse:25:undefined:DRAFT:undefined:undefined';
 
       cacheService.browseKey.mockResolvedValue(expectedKey);
 
-      const response = await controller.browseArticles({ limit: 25 });
+      const response = await controller.browseArticles({
+        limit: 25,
+        status: ArticleStatus.DRAFT,
+      });
 
       expect(cacheService.browseKey).toHaveBeenCalled();
       expect(cacheService.get).toHaveBeenCalledWith(expectedKey);
       expect(articleService.browse).toHaveBeenCalledWith(
         25,
         undefined,
-        undefined,
+        ArticleStatus.DRAFT,
         undefined,
         undefined,
       );
@@ -120,11 +123,12 @@ describe('ArticleController', () => {
       const response = await controller.browseArticles({
         cursorId,
         limit: 25,
+        status: ArticleStatus.DRAFT,
       });
       expect(articleService.browse).toHaveBeenCalledWith(
         25,
         cursorId,
-        undefined,
+        ArticleStatus.DRAFT,
         undefined,
         undefined,
       );
@@ -362,7 +366,7 @@ describe('ArticleController', () => {
 
     it('browseArticles() returns cached value if set', async () => {
       const expectedKey =
-        'articles:v1:browse:25:undefined:undefined:undefined:undefined';
+        'articles:v1:browse:25:undefined:DRAFT:undefined:undefined';
       const expectedValue = {
         data: [],
         hasMore: false,
@@ -371,7 +375,10 @@ describe('ArticleController', () => {
       cacheService.browseKey.mockResolvedValue(expectedKey);
       cacheService.get.mockResolvedValue(expectedValue);
 
-      const response = await controller.browseArticles({ limit: 25 });
+      const response = await controller.browseArticles({
+        limit: 25,
+        status: ArticleStatus.DRAFT,
+      });
 
       expect(cacheService.browseKey).toHaveBeenCalled();
       expect(cacheService.get).toHaveBeenCalledWith(expectedKey);

@@ -78,18 +78,14 @@ describe('App Throttle (e2e)', () => {
 
     it('no 429 on removeArticle() below throttle limit', async () => {
       for (let i = 1; i <= 100; i++) {
-        await asAdmin('delete', `/articles/${crypto.randomUUID()}`).expect(
-          404,
-        );
+        await asAdmin('delete', `/articles/${crypto.randomUUID()}`).expect(404);
       }
       await asAdmin('delete', `/articles/${crypto.randomUUID()}`).expect(429);
     });
 
     it('no 429 on findById() below throttle limit', async () => {
       for (let i = 1; i <= 100; i++) {
-        await asAdmin('get', `/articles/id/${crypto.randomUUID()}`).expect(
-          404,
-        );
+        await asAdmin('get', `/articles/id/${crypto.randomUUID()}`).expect(404);
       }
       await asAdmin('get', `/articles/id/${crypto.randomUUID()}`).expect(429);
     });

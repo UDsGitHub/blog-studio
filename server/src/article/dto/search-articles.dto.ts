@@ -25,11 +25,12 @@ export class SearchArticlesQueryDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  limit: number = 25;
+  limit: number = 4;
 
-  @IsOptional()
-  @IsEnum(ArticleStatus)
-  status?: ArticleStatus;
+  @IsEnum(ArticleStatus, {
+    message: 'Status must be one of either Draft, Published, or Archived',
+  })
+  status!: ArticleStatus;
 
   @IsOptional()
   @Type(() => Date)

@@ -26,10 +26,10 @@ describe('Article Query Guard', () => {
     expect(set).not.toHaveBeenCalled();
   });
 
-  it('missing status returns true when authenticated', () => {
+  it('missing status throws 400 when authenticated', () => {
     getRequest.mockReturnValue({ isAuthenticated: true, query: {} });
-    expect(guard.canActivate(context)).toBe(true);
-    expect(set).toHaveBeenCalledWith('Cache-control', 'private, no-store');
+    expect(() => guard.canActivate(context)).toThrow(BadRequestException);
+    expect(set).not.toHaveBeenCalled();
   });
 
   it('DRAFT | ARCHIVED fetch throws 401 when unauthenticated', () => {
@@ -60,24 +60,6 @@ describe('Article Query Guard', () => {
     expect(guard.canActivate(context)).toBe(true);
     expect(guard.canActivate(context)).toBe(true);
     expect(set).toHaveBeenCalledWith('Cache-control', 'private, no-store');
-  });
-
-  it('throws 400 when date range filter are passed without status', () => {
-    getRequest.mockReturnValueOnce({
-      isAuthenticated: true,
-      query: { endDate: new Date('2026-09-10') },
-    });
-    getRequest.mockReturnValueOnce({
-      isAuthenticated: true,
-      query: {
-        startDate: new Date('2026-09-05'),
-        endDate: new Date('2026-09-10'),
-      },
-    });
-
-    expect(() => guard.canActivate(context)).toThrow(BadRequestException);
-    expect(() => guard.canActivate(context)).toThrow(BadRequestException);
-    expect(set).not.toHaveBeenCalled();
   });
 
   it('returns true when date range filters are passed with status', () => {

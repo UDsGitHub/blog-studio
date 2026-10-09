@@ -15,7 +15,7 @@ import { getUrlQueryParamsFromObject } from "./utils";
 export const articlesApi = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({
-    baseUrl: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000",
+    baseUrl: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3001",
     prepareHeaders: (headers) => {
       const apiKey = localStorage.getItem(
         import.meta.env.VITE_API_STORAGE_KEY ?? "blog-studio-apikey",
@@ -51,7 +51,7 @@ export const articlesApi = createApi({
     >({
       query: (request) => {
         const params = getUrlQueryParamsFromObject(request);
-        return `articles?${params.toString()}`;
+        return `articles/search?${params.toString()}`;
       },
     }),
     findArticleById: builder.query<Article, FindArticleByIdRequest>({
